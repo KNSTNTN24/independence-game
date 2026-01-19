@@ -932,17 +932,16 @@
       useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('success') === 'true') {
-          showToast('✅ Оплата прошла успешно! Добро пожаловать в Premium!', 'success');
-          // Refresh profile to get updated premium status
-          if (user) {
-            setTimeout(() => window.location.href = '/', 2000);
-          }
+          // Clear URL first to prevent loops
           window.history.replaceState({}, '', '/');
+          setToast({ message: '✅ Оплата прошла успешно! Добро пожаловать в Premium!', type: 'success' });
+          // Reload page after 2 seconds to refresh profile
+          setTimeout(() => window.location.reload(), 2000);
         } else if (params.get('canceled') === 'true') {
-          showToast('Оплата отменена', 'warning');
           window.history.replaceState({}, '', '/');
+          setToast({ message: 'Оплата отменена', type: 'warning' });
         }
-      }, [user]);
+      }, []);
 
       const sys = SYSTEMS[system];
       const diff = DIFFICULTIES[difficulty];
