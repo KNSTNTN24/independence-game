@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b"/>
+      <stop offset="100%" style="stop-color:#0f172a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="50%" style="stop-color:#d97706"/>
+      <stop offset="100%" style="stop-color:#92400e"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="192" height="192" fill="url(#bg)" rx="24"/>
+  
+  <!-- Golden border -->
+  <rect x="12" y="12" width="168" height="168" fill="none" stroke="#d97706" stroke-width="3" rx="16"/>
+  
+  <!-- Corner decorations -->
+  <path d="M24,52 L24,24 L52,24" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <path d="M140,24 L168,24 L168,52" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <path d="M24,140 L24,168 L52,168" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <path d="M140,168 L168,168 L168,140" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  
+  <!-- Center "I" letter -->
+  <text x="96" y="118" font-family="Georgia, serif" font-size="90" font-weight="bold" 
+        fill="url(#gold)" text-anchor="middle">I</text>
+  
+  <!-- Stars -->
+  <text x="50" y="58" font-size="14" fill="#d97706">★</text>
+  <text x="142" y="58" font-size="14" fill="#d97706">★</text>
+  <text x="50" y="150" font-size="14" fill="#d97706">★</text>
+  <text x="142" y="150" font-size="14" fill="#d97706">★</text>
+</svg>

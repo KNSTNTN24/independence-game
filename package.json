@@ -1,0 +1,9 @@
+{
+  "name": "independence-game",
+  "version": "2.0.0",
+  "description": "Independence - Civic Education Game with Stripe payments",
+  "dependencies": {
+    "stripe": "^14.0.0",
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

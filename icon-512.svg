@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b"/>
+      <stop offset="100%" style="stop-color:#0f172a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fbbf24"/>
+      <stop offset="50%" style="stop-color:#d97706"/>
+      <stop offset="100%" style="stop-color:#92400e"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bg)" rx="64"/>
+  
+  <!-- Golden border -->
+  <rect x="28" y="28" width="456" height="456" fill="none" stroke="#d97706" stroke-width="8" rx="40"/>
+  
+  <!-- Corner decorations -->
+  <path d="M60,130 L60,60 L130,60" fill="none" stroke="#fbbf24" stroke-width="4"/>
+  <path d="M382,60 L452,60 L452,130" fill="none" stroke="#fbbf24" stroke-width="4"/>
+  <path d="M60,382 L60,452 L130,452" fill="none" stroke="#fbbf24" stroke-width="4"/>
+  <path d="M382,452 L452,452 L452,382" fill="none" stroke="#fbbf24" stroke-width="4"/>
+  
+  <!-- Center "I" letter -->
+  <text x="256" y="310" font-family="Georgia, serif" font-size="220" font-weight="bold" 
+        fill="url(#gold)" text-anchor="middle">I</text>
+  
+  <!-- Stars -->
+  <text x="130" y="150" font-size="36" fill="#d97706">★</text>
+  <text x="382" y="150" font-size="36" fill="#d97706">★</text>
+  <text x="130" y="400" font-size="36" fill="#d97706">★</text>
+  <text x="382" y="400" font-size="36" fill="#d97706">★</text>
+  
+  <!-- Subtitle -->
+  <text x="256" y="440" font-family="Arial, sans-serif" font-size="24" 
+        fill="#fbbf24" text-anchor="middle" letter-spacing="6">INDEPENDENCE</text>
+</svg>
