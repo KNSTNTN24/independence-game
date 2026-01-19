@@ -43,7 +43,7 @@ exports.handler = async (event) => {
             product_data: {
               name: 'Independence Premium',
               description: 'Все политические системы, достижения, без рекламы',
-              images: ['https://tourmaline-licorice-030bf8.netlify.app/icon-512.svg'],
+              images: ['https://independence-stripe.netlify.app/icon-512.svg'],
             },
             unit_amount: 299, // £2.99 in pence
             recurring: {
@@ -53,8 +53,8 @@ exports.handler = async (event) => {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.URL || 'https://tourmaline-licorice-030bf8.netlify.app'}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.URL || 'https://tourmaline-licorice-030bf8.netlify.app'}/?canceled=true`,
+      success_url: `${process.env.URL || 'https://independence-stripe.netlify.app'}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.URL || 'https://independence-stripe.netlify.app'}/?canceled=true`,
       metadata: {
         userId: userId,
       },
