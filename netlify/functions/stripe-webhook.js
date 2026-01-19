@@ -61,6 +61,13 @@ exports.handler = async (event) => {
       case 'invoice.paid': {
         // Subscription renewal
         const invoice = stripeEvent.data.object;
+        
+        // Skip if no subscription (one-time payment)
+        if (!invoice.subscription) {
+          console.log('Invoice paid but no subscription - skipping');
+          break;
+        }
+        
         const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
         const userId = subscription.metadata?.userId;
 
