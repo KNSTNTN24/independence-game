@@ -367,6 +367,28 @@
         return selected;
       },[system,usedEvents]);
 
+      const checkGameEnd=useCallback((newStats,newTurn)=>{
+        // Immediate defeat conditions
+        if(newStats.stability<=0){endGame(false,'stability');return true;}
+        if(newStats.happiness<=0){endGame(false,'happiness');return true;}
+        // Special system risks
+        if(sys.traits.rebellionRisk&&newStats.happiness<sys.traits.rebellionRisk&&Math.random()<0.3){showToast(t('defeat.rebellion'),'error');setTimeout(()=>endGame(false,'rebellion'),1000);return true;}
+        if(sys.traits.coupRisk&&newStats.stability<sys.traits.coupRisk&&Math.random()<0.3){showToast(t('defeat.coup'),'error');setTimeout(()=>endGame(false,'coup'),1000);return true;}
+        // Early victory conditions
+        if(newStats.happiness>=95){endGame(true,'utopia');return true;}
+        if(newStats.wealth>=95){endGame(true,'prosperity');return true;}
+        // End of game check
+        if(newTurn>maxTurns){
+          if(newStats.happiness>=targetHappiness&&newStats.wealth>=targetWealth&&newStats.stability>=targetStability){
+            endGame(true,'survival');
+          }else{
+            endGame(false,'stability');
+          }
+          return true;
+        }
+        return false;
+      },[sys,maxTurns,targetHappiness,targetWealth,targetStability,endGame,showToast,t]);
+
       const processTurn=useCallback(()=>{
         if(remaining<0){showToast('❌ Budget exceeded!','error');return;}
         if(sys.traits.needsApproval&&stats.happiness<sys.traits.threshold){if(Math.random()>0.4){showToast('🏛️ Parliament rejected!','warning');return;}}
@@ -383,25 +405,23 @@
         setUsedEvents(prev=>[...prev,...events.map(e=>e.id)]);
         setEventQueue(events);
         if(events.length>0){setEvent(events[0]);setEventQueue(events.slice(1));setPhase('event');}
-        else{setTurn(t=>t+1);setPhase('playing');}
-      },[remaining,sys,stats,difficulty,budget,planet,eventsPerTurn,getRandomEvents,showToast]);
+        else{
+          const newTurn=turn+1;
+          if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setPhase('playing');}
+        }
+      },[remaining,sys,stats,difficulty,budget,planet,eventsPerTurn,turn,getRandomEvents,checkGameEnd,showToast]);
 
       const handleChoice=useCallback((choice)=>{
         const d=DIFFICULTIES[difficulty];let newStats={...stats};
         Object.entries(choice.effects).forEach(([k,v])=>{if(newStats[k]!==undefined){const effectValue=v<0?v*d.severity:v;newStats[k]=Math.max(0,Math.min(100,newStats[k]+effectValue));}});
         let newHydro=hydrobite-choice.cost+(choice.hydro||0);setHydrobite(Math.max(0,newHydro));setStats(newStats);
 
-        if(sys.traits.rebellionRisk&&newStats.happiness<sys.traits.rebellionRisk&&Math.random()<0.3){showToast(t('defeat.rebellion'),'error');setTimeout(()=>endGame(false,'rebellion'),1000);return;}
-        if(sys.traits.coupRisk&&newStats.stability<sys.traits.coupRisk&&Math.random()<0.3){showToast(t('defeat.coup'),'error');setTimeout(()=>endGame(false,'coup'),1000);return;}
-        if(newStats.stability<=0){endGame(false,'stability');return;}
-        if(newStats.happiness<=0){endGame(false,'happiness');return;}
-        if(turn>=maxTurns&&newStats.happiness>=targetHappiness&&newStats.wealth>=targetWealth&&newStats.stability>=targetStability){endGame(true,'survival');return;}
-        if(newStats.happiness>=95){endGame(true,'utopia');return;}
-        if(newStats.wealth>=95){endGame(true,'prosperity');return;}
-
         if(eventQueue.length>0){setEvent(eventQueue[0]);setEventQueue(q=>q.slice(1));}
-        else{setTurn(t=>t+1);setEvent(null);setPhase('playing');}
-      },[difficulty,stats,hydrobite,sys,turn,maxTurns,eventQueue,targetHappiness,targetWealth,targetStability,endGame,showToast,t]);
+        else{
+          const newTurn=turn+1;
+          if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setEvent(null);setPhase('playing');}
+        }
+      },[difficulty,stats,hydrobite,turn,eventQueue,checkGameEnd]);
 
       const handleBudget=useCallback((sector,val)=>{setBudget(prev=>({...prev,[sector]:Math.max(0,Math.min(50,parseInt(val)||0))}));},[]);
 
