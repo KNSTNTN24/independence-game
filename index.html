@@ -11,1534 +11,477 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/svg+xml" href="/icon-192.svg">
   <title>Independence - Civic Education Game</title>
-
-  <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <!-- React & Tools -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Raleway:wght@300;400;600;700&display=swap');
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; padding: 0; font-family: 'Raleway', sans-serif; background: #0f172a; overscroll-behavior: none; }
-    .safe-top { padding-top: env(safe-area-inset-top); }
-    .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-    .font-display { font-family: 'Cinzel', serif; }
-    .gold-gradient { background: linear-gradient(180deg, #fbbf24 0%, #d97706 50%, #92400e 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .glow-amber { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3); }
-    input[type="range"] { -webkit-appearance: none; height: 8px; border-radius: 4px; }
-    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(180deg, #fbbf24, #d97706); cursor: pointer; }
-    input[type="range"]::-moz-range-thumb { width: 28px; height: 28px; border-radius: 50%; border: none; background: linear-gradient(180deg, #fbbf24, #d97706); cursor: pointer; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes confetti { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
-    .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-    .animate-slideUp { animation: slideUp 0.4s ease-out; }
-    .animate-pulse { animation: pulse 2s infinite; }
-    .animate-spin { animation: spin 1s linear infinite; }
-    button { min-height: 44px; cursor: pointer; transition: all 0.15s; }
-    button:active { transform: scale(0.97); }
-    input:not([type="range"]), button { font-family: inherit; }
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-    .toast { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 200; max-width: 90%; }
-    .star-bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
-    .star { position: absolute; width: 2px; height: 2px; background: white; border-radius: 50%; opacity: 0.5; }
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;padding:0;font-family:'Raleway',sans-serif;background:#0f172a;overscroll-behavior:none}
+    .safe-top{padding-top:env(safe-area-inset-top)}.safe-bottom{padding-bottom:env(safe-area-inset-bottom)}
+    .font-display{font-family:'Cinzel',serif}
+    .gold-gradient{background:linear-gradient(180deg,#fbbf24 0%,#d97706 50%,#92400e 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    input[type="range"]{-webkit-appearance:none;height:8px;border-radius:4px}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#d97706);cursor:pointer}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .animate-fadeIn{animation:fadeIn .3s ease-out}.animate-slideUp{animation:slideUp .4s ease-out}
+    .animate-pulse{animation:pulse 2s infinite}.animate-spin{animation:spin 1s linear infinite}
+    button{min-height:44px;cursor:pointer;transition:all .15s}button:active{transform:scale(.97)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:200;max-width:90%}
+    .star-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+    .star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;opacity:.5}
   </style>
 </head>
 <body class="safe-top safe-bottom">
   <div id="root"></div>
-
   <script type="text/babel">
-    const { useState, useEffect, useCallback, createContext, useContext, useMemo } = React;
+    const{useState,useEffect,useCallback,createContext,useContext,useMemo}=React;
 
-    // ============================================
-    // ⚠️ SUPABASE CONFIG - ЗАМЕНИТЕ НА СВОИ ДАННЫЕ!
-    // ============================================
-    const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
-    
-    // Initialize Supabase client
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ===== CONFIG =====
+    const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
+    const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    const STRIPE_KEY='pk_live_51SrFQOH02sKb65Xcey2pn7bvJhJQ1EqpjYyAoiVKK3OmGZjlKCMRmuX4t6zUitqQ2RHI7MIceHAkHYadAi4r31D900L7ki97pX';
 
-    // ============================================
-    // STRIPE CONFIG
-    // ============================================
-    const STRIPE_PUBLISHABLE_KEY = 'pk_live_51SrFQOH02sKb65Xcey2pn7bvJhJQ1EqpjYyAoiVKK3OmGZjlKCMRmuX4t6zUitqQ2RHI7MIceHAkHYadAi4r31D900L7ki97pX';
-    const PREMIUM_PRICE = '£2.99/мес';
+    // ===== LOCALIZATION =====
+    const T={
+      ui:{
+        title:{ru:'INDEPENDENCE',en:'INDEPENDENCE',de:'INDEPENDENCE'},
+        subtitle:{ru:'ОБРАЗОВАТЕЛЬНАЯ ИГРА О ПОЛИТИКЕ',en:'CIVIC EDUCATION GAME',de:'POLITISCHES BILDUNGSSPIEL'},
+        login:{ru:'Войти',en:'Login',de:'Anmelden'},
+        register:{ru:'Регистрация',en:'Register',de:'Registrieren'},
+        premium:{ru:'Premium',en:'Premium',de:'Premium'},
+        premiumPrice:{ru:'£2.99/мес',en:'£2.99/mo',de:'£2.99/Mo'},
+        startGame:{ru:'Начать игру',en:'Start Game',de:'Spiel starten'},
+        year:{ru:'Год',en:'Year',de:'Jahr'},
+        submit:{ru:'Утвердить бюджет',en:'Submit Budget',de:'Budget bestätigen'},
+        happiness:{ru:'Счастье',en:'Happiness',de:'Zufriedenheit'},
+        wealth:{ru:'Богатство',en:'Wealth',de:'Wohlstand'},
+        stability:{ru:'Стабильность',en:'Stability',de:'Stabilität'},
+        budget:{ru:'Бюджет',en:'Budget',de:'Budget'},
+        remaining:{ru:'Остаток',en:'Remaining',de:'Verbleibend'},
+        victory:{ru:'ПОБЕДА!',en:'VICTORY!',de:'SIEG!'},
+        defeat:{ru:'ПОРАЖЕНИЕ',en:'DEFEAT',de:'NIEDERLAGE'},
+        playAgain:{ru:'Играть снова',en:'Play Again',de:'Nochmal spielen'},
+        back:{ru:'Назад',en:'Back',de:'Zurück'},
+        next:{ru:'Далее',en:'Next',de:'Weiter'},
+        skip:{ru:'Пропустить',en:'Skip',de:'Überspringen'},
+        close:{ru:'Закрыть',en:'Close',de:'Schließen'},
+        easy:{ru:'Легко',en:'Easy',de:'Leicht'},
+        normal:{ru:'Нормально',en:'Normal',de:'Normal'},
+        hard:{ru:'Сложно',en:'Hard',de:'Schwer'},
+        years:{ru:'лет',en:'years',de:'Jahre'},
+        choosePlanet:{ru:'Выберите планету',en:'Choose Planet',de:'Planet wählen'},
+        score:{ru:'Очки',en:'Score',de:'Punkte'},
+        signOut:{ru:'Выйти',en:'Sign Out',de:'Abmelden'},
+        email:{ru:'Email',en:'Email',de:'E-Mail'},
+        password:{ru:'Пароль',en:'Password',de:'Passwort'},
+        username:{ru:'Имя',en:'Username',de:'Name'},
+        loading:{ru:'Загрузка...',en:'Loading...',de:'Lädt...'},
+        selectLanguage:{ru:'Выберите язык',en:'Select Language',de:'Sprache wählen'},
+        advancedSettings:{ru:'Расширенные настройки',en:'Advanced Settings',de:'Erweiterte Einstellungen'},
+        target:{ru:'Цель',en:'Target',de:'Ziel'},
+        gameLength:{ru:'Длина игры',en:'Game length',de:'Spiellänge'},
+        eventsPerTurn:{ru:'Событий за ход',en:'Events per turn',de:'Ereignisse pro Zug'},
+        difficulty:{ru:'Сложность',en:'Difficulty',de:'Schwierigkeit'},
+        politicalSystem:{ru:'Политическая система',en:'Political System',de:'Politisches System'},
+      },
+      intro:{
+        title:{ru:'Добро пожаловать, Основатель!',en:'Welcome, Founder!',de:'Willkommen, Gründer!'},
+        p1:{ru:'Поздравляем! Пока остальное человечество погрязло в бюрократических спорах о том, кому принадлежит последняя банка консервированного кислорода, вы проявили инициативу.',en:'Congratulations! While the rest of humanity was busy arguing over who owns the last can of preserved oxygen, you took initiative.',de:'Herzlichen Glückwunsch! Während der Rest der Menschheit sich darüber stritt, wem die letzte Dose Sauerstoff gehört, haben Sie Initiative ergriffen.'},
+        p2:{ru:'Ваш корабль с тысячей колонистов приземлился на планете, которую никто не успел застолбить. Теперь у вас есть уникальная возможность — построить идеальное общество с нуля.',en:'Your ship with a thousand colonists has landed on a planet nobody bothered to claim. Now you have a unique opportunity — to build a perfect society from scratch.',de:'Ihr Schiff mit tausend Kolonisten ist auf einem Planeten gelandet, den niemand beansprucht hat. Jetzt haben Sie eine einzigartige Gelegenheit — eine perfekte Gesellschaft aufzubauen.'},
+        p3:{ru:'Или, как показывает история, очередное неидеальное. Но кто мы такие, чтобы судить?',en:'Or, as history suggests, yet another imperfect one. But who are we to judge?',de:'Oder, wie die Geschichte zeigt, eine weitere unvollkommene. Aber wer sind wir, um zu urteilen?'},
+        mission:{ru:'Ваша задача: создать процветающую цивилизацию, избежав революций, голодных бунтов и неловких ситуаций с соседними колониями.',en:'Your mission: create a thriving civilization while avoiding revolutions, food riots, and awkward situations with neighboring colonies.',de:'Ihre Mission: eine blühende Zivilisation aufbauen und dabei Revolutionen und Hungeraufstände vermeiden.'},
+      },
+      systems:{
+        parliamentary:{name:{ru:'Парламентская демократия',en:'Parliamentary Democracy',de:'Parlamentarische Demokratie'},leader:{ru:'Премьер-министр',en:'Prime Minister',de:'Premierminister'},desc:{ru:'Вы решили позволить людям спорить до хрипоты, а потом голосовать. В дискуссии рождается головная боль, но это детали.',en:'You\'ve decided to let people argue until hoarse, then vote. Discussions produce headaches, but details.',de:'Sie lassen die Menschen diskutieren und dann abstimmen.'}},
+        presidential:{name:{ru:'Президентская республика',en:'Presidential Republic',de:'Präsidialrepublik'},leader:{ru:'Президент',en:'President',de:'Präsident'},desc:{ru:'Один человек, много ответственности. Прямой мандат народа и полная свобода действий.',en:'One person, lots of responsibility. Direct mandate and complete freedom of action.',de:'Eine Person, viel Verantwortung. Direktes Mandat und volle Handlungsfreiheit.'}},
+        monarchy:{name:{ru:'Конституционная монархия',en:'Constitutional Monarchy',de:'Konstitutionelle Monarchie'},leader:{ru:'Монарх',en:'Monarch',de:'Monarch'},desc:{ru:'Зачем выбирать лидера, если можно просто родиться им? Традиции и красивые церемонии.',en:'Why elect when you can be born a leader? Traditions and beautiful ceremonies.',de:'Warum wählen, wenn man als Führer geboren werden kann?'}},
+        dictatorship:{name:{ru:'Диктатура',en:'Dictatorship',de:'Diktatur'},leader:{ru:'Верховный лидер',en:'Supreme Leader',de:'Oberster Führer'},desc:{ru:'Эффективность превыше всего! Демократия — долго и скучно, а вы — человек дела.',en:'Efficiency above all! Democracy is slow and boring, and you\'re a person of action.',de:'Effizienz über alles! Demokratie ist langsam und langweilig.'}},
+        technocracy:{name:{ru:'Технократия',en:'Technocracy',de:'Technokratie'},leader:{ru:'Главный технолог',en:'Chief Technologist',de:'Cheftechnologe'},desc:{ru:'Политики — вчерашний день. Будущее принадлежит экспертам!',en:'Politicians are yesterday. The future belongs to experts!',de:'Politiker sind von gestern. Die Zukunft gehört Experten!'}},
+        direct:{name:{ru:'Прямая демократия',en:'Direct Democracy',de:'Direkte Demokratie'},leader:{ru:'Координатор',en:'Coordinator',de:'Koordinator'},desc:{ru:'Каждый голос важен! По каждому вопросу. Звучит идеально, пока не попробуете.',en:'Every voice matters! On every issue. Sounds ideal until you try it.',de:'Jede Stimme zählt! Bei jedem Thema.'}},
+      },
+      planets:{
+        terranova:{name:{ru:'Терра Нова',en:'Terra Nova',de:'Terra Nova'},desc:{ru:'Скучная? Возможно. Пригодная для жизни? Определённо.',en:'Boring? Perhaps. Habitable? Definitely.',de:'Langweilig? Vielleicht. Bewohnbar? Definitiv.'},traits:{ru:'Сбалансированная',en:'Balanced',de:'Ausgewogen'}},
+        aridia:{name:{ru:'Аридия',en:'Aridia',de:'Aridia'},desc:{ru:'Вода дороже золота. Зато конкуренты не рвутся сюда.',en:'Water worth more than gold. But competitors aren\'t rushing here.',de:'Wasser teurer als Gold.'},traits:{ru:'Пустыня • Минералы',en:'Desert • Minerals',de:'Wüste • Mineralien'}},
+        edemia:{name:{ru:'Эдемия',en:'Edemia',de:'Edemia'},desc:{ru:'Рай! Единственная проблема — все остальные тоже хотят кусочек.',en:'Paradise! Only problem — everyone else wants a piece too.',de:'Paradies! Einziges Problem — alle anderen wollen auch ein Stück.'},traits:{ru:'Богатая • Соседи',en:'Rich • Neighbors',de:'Reich • Nachbarn'}},
+        chaosprime:{name:{ru:'Хаос Прайм',en:'Chaos Prime',de:'Chaos Prime'},desc:{ru:'Землетрясения по вторникам, извержения по пятницам.',en:'Earthquakes on Tuesdays, eruptions on Fridays.',de:'Erdbeben dienstags, Ausbrüche freitags.'},traits:{ru:'Хаос • События',en:'Chaos • Events',de:'Chaos • Ereignisse'}},
+        polaris:{name:{ru:'Полярис',en:'Polaris',de:'Polaris'},desc:{ru:'Вечная мерзлота закаляет характер. Или убивает.',en:'Permafrost builds character. Or kills you.',de:'Permafrost stärkt den Charakter. Oder tötet.'},traits:{ru:'Холод • Единство',en:'Cold • Unity',de:'Kalt • Einheit'}},
+      },
+      sectors:{
+        defence:{name:{ru:'Оборона',en:'Defence',de:'Verteidigung'}},
+        education:{name:{ru:'Образование',en:'Education',de:'Bildung'}},
+        health:{name:{ru:'Здравоохранение',en:'Healthcare',de:'Gesundheit'}},
+        infra:{name:{ru:'Инфраструктура',en:'Infrastructure',de:'Infrastruktur'}},
+        welfare:{name:{ru:'Соцзащита',en:'Welfare',de:'Soziales'}},
+      },
+      defeat:{
+        happiness:{ru:'Народ восстал! Ваше правление окончено.',en:'The people have risen! Your rule is over.',de:'Das Volk hat sich erhoben!'},
+        stability:{ru:'Хаос поглотил вашу цивилизацию.',en:'Chaos has consumed your civilization.',de:'Chaos hat Ihre Zivilisation verschlungen.'},
+        rebellion:{ru:'Мятеж сверг монархию!',en:'A rebellion overthrew the monarchy!',de:'Ein Aufstand hat die Monarchie gestürzt!'},
+        coup:{ru:'Военный переворот!',en:'Military coup!',de:'Militärputsch!'},
+      },
+      victoryMsg:{
+        utopia:{ru:'Утопия достигнута!',en:'Utopia achieved!',de:'Utopie erreicht!'},
+        prosperity:{ru:'Экономическое чудо!',en:'Economic miracle!',de:'Wirtschaftswunder!'},
+        survival:{ru:'Вы провели цивилизацию через все испытания!',en:'You guided your civilization through all challenges!',de:'Sie haben alle Herausforderungen gemeistert!'},
+      },
+    };
 
-    // ============================================
-    // AUTH CONTEXT
-    // ============================================
-    const AuthContext = createContext(null);
-    const useAuth = () => useContext(AuthContext);
+    // ===== GAME DATA =====
+    const DIFFICULTIES={easy:{icon:'😊',bonus:10,hydroBonus:30,severity:0.7},normal:{icon:'😐',bonus:0,hydroBonus:0,severity:1.0},hard:{icon:'😰',bonus:-10,hydroBonus:-20,severity:1.3}};
+    const SYSTEMS={parliamentary:{id:'parliamentary',icon:'🏛️',premium:false,traits:{needsApproval:true,threshold:40,stabilityBonus:0,happinessDecay:0,wealthBonus:0}},presidential:{id:'presidential',icon:'🦅',premium:false,traits:{needsApproval:false,stabilityBonus:0,happinessDecay:0,wealthBonus:5}},monarchy:{id:'monarchy',icon:'👑',premium:true,traits:{needsApproval:false,stabilityBonus:10,happinessDecay:0,wealthBonus:0,rebellionRisk:25}},dictatorship:{id:'dictatorship',icon:'⚔️',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:5,wealthBonus:0,coupRisk:30}},technocracy:{id:'technocracy',icon:'🔬',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:2,wealthBonus:15,startPenalty:10}},direct:{id:'direct',icon:'🗳️',premium:true,traits:{needsApproval:false,stabilityBonus:-5,happinessDecay:-3,wealthBonus:0,referendumChance:0.25}}};
+    const PLANETS={terranova:{id:'terranova',icon:'🌍',difficulty:2,stats:{happiness:60,wealth:50,stability:70},mods:{eventMult:1.0,extraEvents:0}},aridia:{id:'aridia',icon:'🏜️',difficulty:4,stats:{happiness:45,wealth:35,stability:60},mods:{eventMult:1.2,extraEvents:0,happinessDecay:2}},edemia:{id:'edemia',icon:'🌴',difficulty:2,stats:{happiness:75,wealth:70,stability:55},mods:{eventMult:1.0,extraEvents:0,stabilityDecay:2}},chaosprime:{id:'chaosprime',icon:'🌋',difficulty:3,stats:{happiness:50,wealth:55,stability:40},mods:{eventMult:1.5,extraEvents:1,stabilityDecay:3}},polaris:{id:'polaris',icon:'❄️',difficulty:4,stats:{happiness:40,wealth:45,stability:80},mods:{eventMult:0.8,extraEvents:0,happinessDecay:3}}};
+    const SECTORS=[{id:'defence',icon:'🛡️'},{id:'education',icon:'📚'},{id:'health',icon:'🏥'},{id:'infra',icon:'🏗️'},{id:'welfare',icon:'🤝'}];
 
-    function AuthProvider({ children }) {
-      const [user, setUser] = useState(null);
-      const [profile, setProfile] = useState(null);
-      const [loading, setLoading] = useState(true);
-      const [initialized, setInitialized] = useState(false);
+    // ===== EVENTS =====
+    const EVENTS={
+      general:[
+        {id:'pandemic',icon:'🦠',title:{ru:'Эпидемия',en:'Pandemic',de:'Pandemie'},desc:{ru:'Опасный вирус распространяется. Эксперты спорят о происхождении.',en:'A dangerous virus is spreading. Experts argue about its origin.',de:'Ein gefährlicher Virus breitet sich aus.'},choices:[{text:{ru:'Жёсткий карантин',en:'Strict quarantine',de:'Strenge Quarantäne'},effects:{happiness:-20,wealth:-15,stability:10},cost:30},{text:{ru:'Умеренные меры',en:'Moderate measures',de:'Moderate Maßnahmen'},effects:{happiness:-10,wealth:-8,stability:5},cost:15},{text:{ru:'Не вмешиваться',en:'Do nothing',de:'Nichts tun'},effects:{happiness:5,stability:-20},cost:0}]},
+        {id:'strike',icon:'✊',title:{ru:'Забастовка',en:'Strike',de:'Streik'},desc:{ru:'Рабочие требуют улучшения условий.',en:'Workers demand better conditions.',de:'Arbeiter fordern bessere Bedingungen.'},choices:[{text:{ru:'Принять требования',en:'Accept demands',de:'Forderungen akzeptieren'},effects:{happiness:25,wealth:-20},cost:25},{text:{ru:'Частичные уступки',en:'Partial concessions',de:'Teilzugeständnisse'},effects:{happiness:10,wealth:-8,stability:5},cost:12},{text:{ru:'Подавить',en:'Suppress',de:'Unterdrücken'},effects:{happiness:-25,stability:-15,wealth:8},cost:15}]},
+        {id:'discovery',icon:'💎',title:{ru:'Месторождение!',en:'Discovery!',de:'Entdeckung!'},desc:{ru:'Геологи обнаружили огромные залежи ресурса.',en:'Geologists discovered huge deposits.',de:'Geologen haben riesige Vorkommen entdeckt.'},choices:[{text:{ru:'Национализировать',en:'Nationalize',de:'Verstaatlichen'},effects:{happiness:12,wealth:18,stability:5},cost:25,hydro:50},{text:{ru:'Корпорациям',en:'Corporations',de:'Konzerne'},effects:{wealth:30,happiness:-12},cost:5,hydro:30},{text:{ru:'Создать фонд',en:'Create fund',de:'Fonds gründen'},effects:{stability:20,wealth:10,happiness:8},cost:15,hydro:25}]},
+        {id:'drought',icon:'🏜️',title:{ru:'Засуха',en:'Drought',de:'Dürre'},desc:{ru:'Дождя не было месяц. Фермеры смотрят на небо.',en:'No rain for a month. Farmers stare at sky.',de:'Seit einem Monat kein Regen.'},choices:[{text:{ru:'Нормирование воды',en:'Water rationing',de:'Wasserrationierung'},effects:{happiness:-15,stability:10},cost:10},{text:{ru:'Срочная ирригация',en:'Emergency irrigation',de:'Notbewässerung'},effects:{wealth:-20,happiness:5,stability:5},cost:35},{text:{ru:'Импорт воды',en:'Import water',de:'Wasser importieren'},effects:{wealth:-15,stability:-5},cost:25}]},
+        {id:'techno_disaster',icon:'☢️',title:{ru:'Техногенная катастрофа',en:'Industrial Disaster',de:'Industriekatastrophe'},desc:{ru:'Что-то пошло не так на заводе.',en:'Something went wrong at the factory.',de:'Etwas ist schiefgelaufen.'},choices:[{text:{ru:'Эвакуация',en:'Evacuation',de:'Evakuierung'},effects:{happiness:-10,wealth:-15,stability:15},cost:30},{text:{ru:'Скрыть',en:'Hide',de:'Verbergen'},effects:{happiness:5,stability:-20},cost:10},{text:{ru:'Компенсации',en:'Compensation',de:'Entschädigung'},effects:{happiness:10,wealth:-25},cost:40}]},
+        {id:'infra_collapse',icon:'🌉',title:{ru:'Мост рухнул',en:'Bridge Collapsed',de:'Brücke eingestürzt'},desc:{ru:'Мост, который "ещё сто лет простоит", простоял до вторника.',en:'The bridge "meant to last 100 years" lasted until Tuesday.',de:'Die Brücke hielt bis Dienstag.'},choices:[{text:{ru:'Срочный ремонт',en:'Emergency repair',de:'Notreparatur'},effects:{wealth:-20,stability:10},cost:35},{text:{ru:'Объезд',en:'Detour',de:'Umleitung'},effects:{happiness:-15,wealth:-5},cost:10},{text:{ru:'Новый мост',en:'New bridge',de:'Neue Brücke'},effects:{wealth:-30,happiness:15,stability:15},cost:50}]},
+        {id:'journalism',icon:'📰',title:{ru:'Журналисты раскопали...',en:'Journalists uncovered...',de:'Journalisten aufgedeckt...'},desc:{ru:'Независимые журналисты раскопали что-то.',en:'Independent journalists uncovered something.',de:'Unabhängige Journalisten haben etwas aufgedeckt.'},choices:[{text:{ru:'Поддержать прессу',en:'Support press',de:'Presse unterstützen'},effects:{happiness:15,stability:-10},cost:5},{text:{ru:'Засекретить',en:'Classify',de:'Klassifizieren'},effects:{stability:10,happiness:-15},cost:20},{text:{ru:'Дискредитировать',en:'Discredit',de:'Diskreditieren'},effects:{happiness:-20,stability:5},cost:15}]},
+        {id:'rumors',icon:'🗣️',title:{ru:'Слухи',en:'Rumors',de:'Gerüchte'},desc:{ru:'Кто-то пустил слух. Половина колонии верит.',en:'Someone started a rumor. Half the colony believes it.',de:'Jemand hat ein Gerücht gestreut.'},choices:[{text:{ru:'Опровержение',en:'Denial',de:'Dementierung'},effects:{stability:5,happiness:-5},cost:5},{text:{ru:'Прозрачность',en:'Transparency',de:'Transparenz'},effects:{happiness:20,stability:-10,wealth:-5},cost:15},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{stability:-15},cost:0}]},
+        {id:'diplomatic_scandal',icon:'🤦',title:{ru:'Дипскандал',en:'Diplomatic Scandal',de:'Diplomatischer Skandal'},desc:{ru:'Ваш посол сказал что-то не то.',en:'Your ambassador said something wrong.',de:'Ihr Botschafter hat etwas Falsches gesagt.'},choices:[{text:{ru:'Извиниться',en:'Apologize',de:'Entschuldigen'},effects:{happiness:-5,stability:10},cost:10},{text:{ru:'Стоять на своём',en:'Stand firm',de:'Standhaft bleiben'},effects:{happiness:10,stability:-15},cost:0},{text:{ru:'Отозвать посла',en:'Recall ambassador',de:'Botschafter zurückrufen'},effects:{stability:5},cost:5}]},
+        {id:'tech_breakthrough',icon:'🔬',title:{ru:'Научный прорыв',en:'Scientific Breakthrough',de:'Durchbruch'},desc:{ru:'Учёные совершили открытие.',en:'Scientists made a discovery.',de:'Wissenschaftler haben eine Entdeckung gemacht.'},choices:[{text:{ru:'Финансирование',en:'Funding',de:'Finanzierung'},effects:{wealth:20,happiness:12,stability:5},cost:30},{text:{ru:'Поделиться',en:'Share',de:'Teilen'},effects:{happiness:15,stability:8},cost:10},{text:{ru:'Засекретить',en:'Classify',de:'Geheim halten'},effects:{wealth:12,stability:-8},cost:8}]},
+        {id:'festival',icon:'🎉',title:{ru:'Праздник',en:'Festival',de:'Festival'},desc:{ru:'Годовщина основания! Граждане ждут праздника.',en:'Anniversary! Citizens expect celebration.',de:'Jahrestag! Bürger erwarten Feier.'},choices:[{text:{ru:'Грандиозный',en:'Grand',de:'Groß'},effects:{happiness:25,wealth:-15},cost:25},{text:{ru:'Скромный',en:'Modest',de:'Bescheiden'},effects:{happiness:10,wealth:-5},cost:10},{text:{ru:'Рабочий день',en:'Working day',de:'Arbeitstag'},effects:{happiness:-15,wealth:5},cost:0}]},
+      ],
+      parliamentary:[
+        {id:'coalition',icon:'💔',title:{ru:'Развал коалиции',en:'Coalition Collapse',de:'Koalitionszerfall'},desc:{ru:'Партии не могут договориться.',en:'Parties can\'t agree.',de:'Parteien können sich nicht einigen.'},choices:[{text:{ru:'Переговоры',en:'Negotiate',de:'Verhandeln'},effects:{stability:-10,happiness:-5},cost:15},{text:{ru:'Новая коалиция',en:'New coalition',de:'Neue Koalition'},effects:{stability:5,happiness:10},cost:20},{text:{ru:'Выборы',en:'Elections',de:'Wahlen'},effects:{stability:-20,happiness:15},cost:30}]},
+        {id:'lobbyists',icon:'💼',title:{ru:'Лоббисты',en:'Lobbyists',de:'Lobbyisten'},desc:{ru:'Некоторые законы подозрительно выгодны компаниям.',en:'Some laws suspiciously benefit companies.',de:'Einige Gesetze sind verdächtig vorteilhaft.'},choices:[{text:{ru:'Реформа',en:'Reform',de:'Reform'},effects:{happiness:20,wealth:-10,stability:5},cost:20},{text:{ru:'Показательный процесс',en:'Show trial',de:'Schauprozess'},effects:{happiness:10,stability:-5},cost:10},{text:{ru:'Замять',en:'Cover up',de:'Vertuschen'},effects:{stability:-15,happiness:-10},cost:25}]},
+        {id:'deadlock',icon:'🔒',title:{ru:'Тупик',en:'Deadlock',de:'Sackgasse'},desc:{ru:'Депутаты не могут договориться уже неделю.',en:'MPs can\'t agree for a week.',de:'Abgeordnete können sich nicht einigen.'},choices:[{text:{ru:'Вмешаться',en:'Intervene',de:'Eingreifen'},effects:{stability:10,happiness:-10},cost:5},{text:{ru:'Ждать',en:'Wait',de:'Warten'},effects:{stability:-15,happiness:5},cost:0},{text:{ru:'Референдум',en:'Referendum',de:'Referendum'},effects:{happiness:15,wealth:-10},cost:20}]}
+      ],
+      presidential:[
+        {id:'impeachment',icon:'⚖️',title:{ru:'Импичмент',en:'Impeachment',de:'Amtsenthebung'},desc:{ru:'Оппозиция собрала голоса для обсуждения.',en:'Opposition gathered votes.',de:'Opposition hat Stimmen gesammelt.'},choices:[{text:{ru:'Договориться',en:'Negotiate',de:'Verhandeln'},effects:{stability:10,happiness:-5,wealth:-10},cost:20},{text:{ru:'Мобилизовать',en:'Mobilize',de:'Mobilisieren'},effects:{happiness:15,stability:-10},cost:15},{text:{ru:'Защита',en:'Defense',de:'Verteidigung'},effects:{stability:5,wealth:-15},cost:25}]},
+        {id:'admin_scandal',icon:'🗞️',title:{ru:'Скандал',en:'Scandal',de:'Skandal'},desc:{ru:'Ваш помощник сказал что-то не то.',en:'Your aide said something wrong.',de:'Ihr Berater hat etwas Falsches gesagt.'},choices:[{text:{ru:'Уволить',en:'Fire',de:'Entlassen'},effects:{stability:10,happiness:5},cost:5},{text:{ru:'Защитить',en:'Defend',de:'Verteidigen'},effects:{happiness:-10,stability:-5},cost:0},{text:{ru:'Отвлечь',en:'Distract',de:'Ablenken'},effects:{happiness:-5,wealth:-10},cost:15}]},
+        {id:'constitutional',icon:'📜',title:{ru:'Конституционный кризис',en:'Constitutional Crisis',de:'Verfassungskrise'},desc:{ru:'Суд и Парламент не согласны с вами.',en:'Court and Parliament disagree.',de:'Gericht und Parlament anderer Meinung.'},choices:[{text:{ru:'Уступить',en:'Yield',de:'Nachgeben'},effects:{stability:15,happiness:-10},cost:0},{text:{ru:'Реформа',en:'Reform',de:'Reform'},effects:{stability:-15,happiness:10,wealth:-20},cost:30},{text:{ru:'К народу',en:'To people',de:'Zum Volk'},effects:{happiness:20,stability:-10},cost:15}]}
+      ],
+      monarchy:[
+        {id:'heir_scandal',icon:'👑',title:{ru:'Скандал наследника',en:'Heir Scandal',de:'Erben-Skandal'},desc:{ru:'Наследник посетил сомнительное заведение.',en:'Heir visited questionable place.',de:'Erbe besuchte fragwürdigen Ort.'},choices:[{text:{ru:'Извинение',en:'Apology',de:'Entschuldigung'},effects:{happiness:5,stability:10},cost:5},{text:{ru:'Защитить',en:'Defend',de:'Verteidigen'},effects:{happiness:-10,stability:-5},cost:0},{text:{ru:'В "отпуск"',en:'"Vacation"',de:'"Urlaub"'},effects:{stability:15,happiness:-5},cost:20}]},
+        {id:'succession',icon:'⚔️',title:{ru:'Наследование',en:'Succession',de:'Erbfolge'},desc:{ru:'Три претендента на трон.',en:'Three claimants to the throne.',de:'Drei Thronprätendenten.'},choices:[{text:{ru:'Совет',en:'Council',de:'Rat'},effects:{stability:15,happiness:-5},cost:10},{text:{ru:'Голосование',en:'Vote',de:'Abstimmung'},effects:{happiness:20,stability:-15},cost:25},{text:{ru:'Назначить',en:'Appoint',de:'Ernennen'},effects:{stability:-10,happiness:-10},cost:0}]},
+        {id:'republicans',icon:'🗽',title:{ru:'Республиканцы',en:'Republicans',de:'Republikaner'},desc:{ru:'Часть граждан против монархии.',en:'Some citizens against monarchy.',de:'Einige Bürger gegen Monarchie.'},choices:[{text:{ru:'Диалог',en:'Dialogue',de:'Dialog'},effects:{happiness:10,stability:5},cost:10},{text:{ru:'Традиции',en:'Traditions',de:'Traditionen'},effects:{happiness:-5,stability:15},cost:15},{text:{ru:'Запретить',en:'Ban',de:'Verbieten'},effects:{stability:-20,happiness:-15},cost:20}]}
+      ],
+      dictatorship:[
+        {id:'generals',icon:'🎖️',title:{ru:'Заговор генералов',en:'Generals\' Conspiracy',de:'Generalsverschwörung'},desc:{ru:'Генералы часто обедают вместе.',en:'Generals lunch together often.',de:'Generäle essen oft zusammen.'},choices:[{text:{ru:'Арест',en:'Arrest',de:'Verhaftung'},effects:{stability:20,happiness:-15},cost:20},{text:{ru:'Перетасовать',en:'Shuffle',de:'Umstrukturieren'},effects:{stability:10,happiness:-5},cost:10},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{stability:-25},cost:0}]},
+        {id:'cult',icon:'🗿',title:{ru:'Культ личности',en:'Personality Cult',de:'Personenkult'},desc:{ru:'Статуй больше, чем жителей.',en:'More statues than residents.',de:'Mehr Statuen als Einwohner.'},choices:[{text:{ru:'Ещё больше!',en:'Even more!',de:'Noch mehr!'},effects:{happiness:-20,stability:10,wealth:-15},cost:25},{text:{ru:'Умеренность',en:'Moderation',de:'Mäßigung'},effects:{happiness:10,stability:-5},cost:0},{text:{ru:'Музеи',en:'Museums',de:'Museen'},effects:{happiness:15,wealth:-5},cost:10}]},
+        {id:'resistance',icon:'📢',title:{ru:'Сопротивление',en:'Resistance',de:'Widerstand'},desc:{ru:'Листовки появляются быстрее, чем их собирают.',en:'Leaflets appear faster than collected.',de:'Flugblätter erscheinen schneller.'},choices:[{text:{ru:'Репрессии',en:'Repression',de:'Repression'},effects:{stability:15,happiness:-25},cost:25},{text:{ru:'Инфильтрация',en:'Infiltration',de:'Infiltration'},effects:{stability:10,happiness:-10,wealth:-10},cost:20},{text:{ru:'Реформы',en:'Reforms',de:'Reformen'},effects:{happiness:20,stability:-15},cost:15}]}
+      ],
+      technocracy:[
+        {id:'algorithm',icon:'🤖',title:{ru:'Бунт против алгоритмов',en:'Algorithm Revolt',de:'Algorithmus-Revolte'},desc:{ru:'Граждане против "машин".',en:'Citizens against "machines".',de:'Bürger gegen "Maschinen".'},choices:[{text:{ru:'Гуманизировать',en:'Humanize',de:'Humanisieren'},effects:{happiness:20,wealth:-10},cost:15},{text:{ru:'Объяснить',en:'Explain',de:'Erklären'},effects:{happiness:5,stability:5},cost:10},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{happiness:-15,stability:-10},cost:0}]},
+        {id:'data_leak',icon:'💾',title:{ru:'Утечка данных',en:'Data Leak',de:'Datenleck'},desc:{ru:'Кто-то слил базу данных.',en:'Someone leaked the database.',de:'Jemand hat Datenbank geleakt.'},choices:[{text:{ru:'Аудит',en:'Audit',de:'Audit'},effects:{stability:15,wealth:-20},cost:30},{text:{ru:'Найти виновного',en:'Find culprit',de:'Schuldigen finden'},effects:{stability:5,happiness:-5},cost:15},{text:{ru:'Амнистия',en:'Amnesty',de:'Amnestie'},effects:{happiness:15,stability:-10},cost:5}]},
+        {id:'experts',icon:'🔬',title:{ru:'Эксперты спорят',en:'Experts Disagree',de:'Experten uneinig'},desc:{ru:'Климат vs экономика. 500 страниц с каждой стороны.',en:'Climate vs economy. 500 pages each side.',de:'Klima vs Wirtschaft. 500 Seiten pro Seite.'},choices:[{text:{ru:'Климат',en:'Climate',de:'Klima'},effects:{happiness:10,wealth:-15,stability:5},cost:20},{text:{ru:'Экономика',en:'Economy',de:'Wirtschaft'},effects:{wealth:15,happiness:-10,stability:5},cost:10},{text:{ru:'Комиссия',en:'Commission',de:'Kommission'},effects:{stability:-10,wealth:-10},cost:15}]}
+      ],
+      direct:[
+        {id:'fatigue',icon:'😴',title:{ru:'Усталость',en:'Fatigue',de:'Müdigkeit'},desc:{ru:'Явка 12%. Тема: обязательные референдумы.',en:'Turnout 12%. Topic: mandatory referendums.',de:'Wahlbeteiligung 12%.'},choices:[{text:{ru:'Обязательное',en:'Mandatory',de:'Obligatorisch'},effects:{happiness:-15,stability:15},cost:20},{text:{ru:'Упростить',en:'Simplify',de:'Vereinfachen'},effects:{happiness:10,wealth:-10},cost:15},{text:{ru:'Меньше',en:'Fewer',de:'Weniger'},effects:{happiness:5,stability:-10},cost:0}]},
+        {id:'populist',icon:'🎪',title:{ru:'Популизм',en:'Populism',de:'Populismus'},desc:{ru:'Голосование: бесплатный космический корабль каждому.',en:'Vote: free spaceship for everyone.',de:'Abstimmung: kostenloses Raumschiff für jeden.'},choices:[{text:{ru:'Объяснить',en:'Explain',de:'Erklären'},effects:{happiness:-10,stability:10},cost:10},{text:{ru:'Компромисс',en:'Compromise',de:'Kompromiss'},effects:{happiness:15,wealth:-20},cost:25},{text:{ru:'Пусть голосуют',en:'Let vote',de:'Abstimmen lassen'},effects:{stability:-15,happiness:5},cost:5}]},
+        {id:'tie',icon:'⚖️',title:{ru:'50/50',en:'50/50',de:'50/50'},desc:{ru:'Голосование 50.0% на 50.0%. Монетку?',en:'Vote 50.0% to 50.0%. Flip coin?',de:'50,0% zu 50,0%. Münze werfen?'},choices:[{text:{ru:'Повторить',en:'Revote',de:'Erneut'},effects:{stability:-5,wealth:-10},cost:15},{text:{ru:'Координатор решит',en:'Coordinator decides',de:'Koordinator entscheidet'},effects:{happiness:-10,stability:10},cost:0},{text:{ru:'Компромисс',en:'Compromise',de:'Kompromiss'},effects:{happiness:5,stability:5},cost:10}]}
+      ]
+    };
 
-      // Load profile from Supabase
-      const loadProfile = useCallback(async (userId) => {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
-          if (!error && data) {
-            setProfile(data);
-          }
-        } catch (e) {
-          console.error('Profile load error:', e);
-        }
-      }, []);
+    // ===== DB HELPERS =====
+    const db={
+      async saveGameResult(userId,data){return await supabase.from('game_results').insert({user_id:userId,planet_name:data.planet,political_system:data.system,difficulty:data.difficulty,max_turns:data.maxTurns,turns_played:data.turn,final_happiness:Math.round(data.stats.happiness),final_wealth:Math.round(data.stats.wealth),final_stability:Math.round(data.stats.stability),final_hydrobite:data.hydrobite,is_victory:data.isVictory,victory_type:data.victoryType,score:data.score,duration_seconds:data.duration});},
+      async getLeaderboard(limit=30){return await supabase.from('profiles').select('id,username,display_name,total_games,total_wins,highest_score').gt('total_games',0).order('highest_score',{ascending:false}).limit(limit);},
+      async getUserAchievements(userId){return await supabase.from('user_achievements').select('*,achievements(*)').eq('user_id',userId);},
+      async unlockAchievement(userId,achievementId){return await supabase.from('user_achievements').upsert({user_id:userId,achievement_id:achievementId},{onConflict:'user_id,achievement_id'});},
+    };
 
-      // Initialize auth state
-      useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          const currentUser = session?.user ?? null;
-          setUser(currentUser);
-          if (currentUser) {
-            loadProfile(currentUser.id);
-          }
-          setLoading(false);
-          setInitialized(true);
+    // ===== AUTH CONTEXT =====
+    const AuthContext=createContext(null);
+    const useAuth=()=>useContext(AuthContext);
+
+    function AuthProvider({children}){
+      const[user,setUser]=useState(null);
+      const[profile,setProfile]=useState(null);
+      const[loading,setLoading]=useState(true);
+      const[initialized,setInitialized]=useState(false);
+
+      const loadProfile=useCallback(async(userId)=>{
+        try{const{data}=await supabase.from('profiles').select('*').eq('id',userId).single();if(data)setProfile(data);}catch(e){}
+      },[]);
+
+      useEffect(()=>{
+        supabase.auth.getSession().then(({data:{session}})=>{
+          const u=session?.user??null;setUser(u);if(u)loadProfile(u.id);setLoading(false);setInitialized(true);
         });
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            const currentUser = session?.user ?? null;
-            setUser(currentUser);
-            
-            if (currentUser) {
-              await loadProfile(currentUser.id);
-            } else {
-              setProfile(null);
-            }
-            setLoading(false);
-          }
-        );
-
-        return () => subscription.unsubscribe();
-      }, [loadProfile]);
-
-      // Auth methods
-      const signUp = async (email, password, username) => {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { username, full_name: username }
-          }
+        const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+          const u=session?.user??null;setUser(u);if(u)await loadProfile(u.id);else setProfile(null);setLoading(false);
         });
-        if (error) throw error;
-        return data;
-      };
+        return()=>subscription.unsubscribe();
+      },[loadProfile]);
 
-      const signIn = async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-        if (error) throw error;
-        return data;
-      };
+      const signUp=async(email,password,username)=>{const{data,error}=await supabase.auth.signUp({email,password,options:{data:{username,full_name:username}}});if(error)throw error;return data;};
+      const signIn=async(email,password)=>{const{data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;return data;};
+      const signOut=async()=>{await supabase.auth.signOut();setUser(null);setProfile(null);};
 
-      const signInWithGoogle = async () => {
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.origin }
-        });
-        if (error) throw error;
-        return data;
-      };
-
-      const signOut = async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-        setUser(null);
-        setProfile(null);
-      };
-
-      const updateProfile = async (updates) => {
-        if (!user) return { error: 'Not authenticated' };
-        const { data, error } = await supabase
-          .from('profiles')
-          .update({ ...updates, updated_at: new Date().toISOString() })
-          .eq('id', user.id)
-          .select()
-          .single();
-        if (!error && data) setProfile(data);
-        return { data, error };
-      };
-
-      const refreshProfile = () => user && loadProfile(user.id);
-
-      const value = {
-        user,
-        profile,
-        loading,
-        initialized,
-        signUp,
-        signIn,
-        signInWithGoogle,
-        signOut,
-        updateProfile,
-        refreshProfile
-      };
-
-      return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+      return(<AuthContext.Provider value={{user,profile,loading,initialized,signUp,signIn,signOut}}>{children}</AuthContext.Provider>);
     }
 
-    // ============================================
-    // DATABASE FUNCTIONS
-    // ============================================
-    const db = {
-      // Save game result
-      async saveGameResult(userId, gameData) {
-        const { data, error } = await supabase
-          .from('game_results')
-          .insert({
-            user_id: userId,
-            planet_name: gameData.planet,
-            political_system: gameData.system,
-            difficulty: gameData.difficulty,
-            max_turns: gameData.maxTurns,
-            final_turn: gameData.turn,
-            final_happiness: Math.round(gameData.stats.happiness),
-            final_wealth: Math.round(gameData.stats.wealth),
-            final_stability: Math.round(gameData.stats.stability),
-            final_hydrobite: gameData.hydrobite,
-            is_victory: gameData.isVictory,
-            victory_type: gameData.victoryType,
-            score: gameData.score,
-            duration_seconds: gameData.duration,
-          })
-          .select()
-          .single();
-        return { data, error };
-      },
-
-      // Get user's game history
-      async getGameHistory(userId, limit = 20) {
-        const { data, error } = await supabase
-          .from('game_results')
-          .select('*')
-          .eq('user_id', userId)
-          .order('finished_at', { ascending: false })
-          .limit(limit);
-        return { data: data || [], error };
-      },
-
-      // Get leaderboard
-      async getLeaderboard(limit = 50) {
-        const { data, error } = await supabase
-          .from('leaderboard')
-          .select('*')
-          .limit(limit);
-        return { data: data || [], error };
-      },
-
-      // Get user achievements
-      async getUserAchievements(userId) {
-        const { data, error } = await supabase
-          .from('user_achievements')
-          .select('*, achievements(*)')
-          .eq('user_id', userId);
-        return { data: data || [], error };
-      },
-
-      // Unlock achievement
-      async unlockAchievement(userId, achievementId, gameId = null) {
-        const { data, error } = await supabase
-          .from('user_achievements')
-          .insert({
-            user_id: userId,
-            achievement_id: achievementId,
-            game_id: gameId
-          })
-          .select()
-          .single();
-        // Ignore duplicate key error
-        if (error?.code === '23505') return { data: null, error: null };
-        return { data, error };
-      },
-
-      // Get all achievements definitions
-      async getAllAchievements() {
-        const { data, error } = await supabase
-          .from('achievements')
-          .select('*')
-          .order('points', { ascending: false });
-        return { data: data || [], error };
-      }
-    };
-
-    // ============================================
-    // GAME CONFIGURATION
-    // ============================================
-    const DIFFICULTIES = {
-      easy: { name: 'Легко', icon: '🌱', bonus: 10, hydroBonus: 20, severity: 0.7 },
-      normal: { name: 'Нормально', icon: '⚖️', bonus: 0, hydroBonus: 0, severity: 1.0 },
-      hard: { name: 'Сложно', icon: '🔥', bonus: -10, hydroBonus: -15, severity: 1.3 },
-    };
-
-    const SYSTEMS = {
-      parliamentary: {
-        id: 'parliamentary', name: 'Парламентская демократия', icon: '🏛️',
-        leader: 'Премьер-министр', premium: false, color: 'indigo',
-        desc: 'Парламент утверждает бюджет. Нужна поддержка народа.',
-        traits: { needsApproval: true, threshold: 40, stabilityBonus: 0, happinessDecay: 0, wealthBonus: 0 }
-      },
-      presidential: {
-        id: 'presidential', name: 'Президентская республика', icon: '🦅',
-        leader: 'Президент', premium: false, color: 'blue',
-        desc: 'Исполнительная власть с системой сдержек.',
-        traits: { needsApproval: false, threshold: 0, stabilityBonus: 0, happinessDecay: 0, wealthBonus: 5 }
-      },
-      monarchy: {
-        id: 'monarchy', name: 'Конституционная монархия', icon: '👑',
-        leader: 'Монарх', premium: true, color: 'purple',
-        desc: 'Традиции и стабильность. Риск восстания.',
-        traits: { needsApproval: false, threshold: 0, stabilityBonus: 10, happinessDecay: 0, wealthBonus: 0, rebellionRisk: 25 }
-      },
-      dictatorship: {
-        id: 'dictatorship', name: 'Диктатура', icon: '⚔️',
-        leader: 'Верховный лидер', premium: true, color: 'red',
-        desc: 'Абсолютная власть. Народ недоволен.',
-        traits: { needsApproval: false, threshold: 0, stabilityBonus: 5, happinessDecay: 5, wealthBonus: 0, coupRisk: 30 }
-      },
-      technocracy: {
-        id: 'technocracy', name: 'Технократия', icon: '🔬',
-        leader: 'Главный технолог', premium: true, color: 'cyan',
-        desc: 'Правление экспертов. Высокий доход.',
-        traits: { needsApproval: false, threshold: 0, stabilityBonus: 5, happinessDecay: 2, wealthBonus: 15, startPenalty: 10 }
-      },
-      direct: {
-        id: 'direct', name: 'Прямая демократия', icon: '🗳️',
-        leader: 'Координатор', premium: true, color: 'green',
-        desc: 'Граждане голосуют за всё. Медленно, но справедливо.',
-        traits: { needsApproval: false, threshold: 0, stabilityBonus: -5, happinessDecay: -3, wealthBonus: 0, referendumChance: 0.25 }
-      },
-    };
-
-    const SECTORS = [
-      { id: 'defence', name: 'Оборона', icon: '🛡️' },
-      { id: 'education', name: 'Образование', icon: '📚' },
-      { id: 'health', name: 'Здравоохранение', icon: '🏥' },
-      { id: 'infra', name: 'Инфраструктура', icon: '🏗️' },
-      { id: 'welfare', name: 'Соцзащита', icon: '🤝' },
-    ];
-
-    const EVENTS = [
-      { id: 'pandemic', title: 'Эпидемия', desc: 'Опасный вирус распространяется по планете.', icon: '🦠', category: 'crisis',
-        choices: [
-          { text: 'Жёсткий карантин', effects: { happiness: -20, wealth: -15, stability: 10 }, cost: 30, hint: 'Спасёт жизни, но ударит по экономике' },
-          { text: 'Умеренные меры', effects: { happiness: -10, wealth: -8, stability: 5 }, cost: 15, hint: 'Баланс между здоровьем и экономикой' },
-          { text: 'Не вмешиваться', effects: { happiness: 5, stability: -20 }, cost: 0, hint: 'Рискованно — возможны жертвы' },
-        ]},
-      { id: 'strike', title: 'Всеобщая забастовка', desc: 'Рабочие требуют улучшения условий труда.', icon: '✊', category: 'social',
-        choices: [
-          { text: 'Принять требования', effects: { happiness: 25, wealth: -20 }, cost: 25, hint: 'Народ будет доволен' },
-          { text: 'Частичные уступки', effects: { happiness: 10, wealth: -8, stability: 5 }, cost: 12, hint: 'Компромисс' },
-          { text: 'Подавить забастовку', effects: { happiness: -25, stability: -15, wealth: 8 }, cost: 15, hint: 'Опасно!' },
-        ]},
-      { id: 'discovery', title: 'Месторождение гидробита!', desc: 'Геологи обнаружили огромные залежи ресурса.', icon: '💎', category: 'opportunity',
-        choices: [
-          { text: 'Национализировать', effects: { happiness: 12, wealth: 18, stability: 5 }, cost: 25, hydro: 50, hint: 'Ресурсы народу!' },
-          { text: 'Отдать корпорациям', effects: { wealth: 30, happiness: -12 }, cost: 5, hydro: 30, hint: 'Быстрая прибыль' },
-          { text: 'Создать фонд', effects: { stability: 20, wealth: 10, happiness: 8 }, cost: 15, hydro: 25, hint: 'Долгосрочная стратегия' },
-        ]},
-      { id: 'reform', title: 'Движение за реформы', desc: 'Активисты требуют политических изменений.', icon: '📜', category: 'political',
-        choices: [
-          { text: 'Поддержать реформы', effects: { happiness: 18, stability: -8 }, cost: 15, hint: 'Прогресс требует жертв' },
-          { text: 'Постепенные изменения', effects: { happiness: 8, stability: 5 }, cost: 8, hint: 'Осторожный путь' },
-          { text: 'Подавить движение', effects: { happiness: -20, stability: 12 }, cost: 12, hint: 'Краткосрочный контроль' },
-        ]},
-      { id: 'disaster', title: 'Метеоритный шторм', desc: 'Космические обломки угрожают планете.', icon: '☄️', category: 'crisis',
-        choices: [
-          { text: 'Максимальная защита', effects: { stability: 15, wealth: -15 }, cost: 30, hint: 'Дорого, но надёжно' },
-          { text: 'Эвакуация', effects: { happiness: -12, stability: 8 }, cost: 15, hint: 'Безопасность важнее' },
-          { text: 'Положиться на удачу', effects: { stability: -20 }, cost: 0, hint: 'Очень рискованно!' },
-        ]},
-      { id: 'tech', title: 'Научный прорыв!', desc: 'Учёные совершили важное открытие.', icon: '🔬', category: 'opportunity',
-        choices: [
-          { text: 'Масштабное финансирование', effects: { wealth: 20, happiness: 12, stability: 5 }, cost: 30, hint: 'Инвестиция в будущее' },
-          { text: 'Поделиться с миром', effects: { happiness: 15, stability: 8 }, cost: 10, hint: 'Дипломатический бонус' },
-          { text: 'Засекретить', effects: { wealth: 12, stability: -8 }, cost: 8, hint: 'Преимущество, но риски' },
-        ]},
-      { id: 'festival', title: 'Праздник Независимости', desc: 'Годовщина основания вашей цивилизации!', icon: '🎉', category: 'social',
-        choices: [
-          { text: 'Грандиозный праздник', effects: { happiness: 25, wealth: -8 }, cost: 25, hint: 'Народ в восторге!' },
-          { text: 'Скромное празднование', effects: { happiness: 12, wealth: -2 }, cost: 10, hint: 'Разумный баланс' },
-          { text: 'Отменить', effects: { happiness: -8, wealth: 5 }, cost: 0, hint: 'Экономия, но разочарование' },
-        ]},
-      { id: 'corruption', title: 'Коррупционный скандал', desc: 'Разоблачена схема хищения средств.', icon: '💰', category: 'political',
-        choices: [
-          { text: 'Публичное расследование', effects: { happiness: 18, stability: -12, wealth: -5 }, cost: 18, hint: 'Прозрачность важна' },
-          { text: 'Тихие реформы', effects: { stability: 8, happiness: -5 }, cost: 10, hint: 'Без лишнего шума' },
-          { text: 'Замять скандал', effects: { happiness: -18, stability: -8 }, cost: 5, hint: 'Может всплыть позже' },
-        ]},
-      { id: 'immigration', title: 'Волна беженцев', desc: 'Тысячи людей просят убежища.', icon: '🚀', category: 'social',
-        choices: [
-          { text: 'Открыть границы', effects: { happiness: -5, wealth: 12, stability: -8 }, cost: 20, hint: 'Рабочая сила' },
-          { text: 'Ограниченный приём', effects: { happiness: 5, wealth: 5, stability: 3 }, cost: 12, hint: 'Баланс' },
-          { text: 'Закрыть границы', effects: { happiness: -10, stability: 10 }, cost: 5, hint: 'Стабильность ценой репутации' },
-        ]},
-      { id: 'energy', title: 'Энергетический кризис', desc: 'Запасы топлива на исходе.', icon: '⚡', category: 'crisis',
-        choices: [
-          { text: 'Зелёная энергетика', effects: { wealth: -12, happiness: 10, stability: 5 }, cost: 28, hydro: -10, hint: 'Долгосрочное решение' },
-          { text: 'Жёсткая экономия', effects: { happiness: -15, wealth: 8 }, cost: 5, hint: 'Быстро, но больно' },
-          { text: 'Закупка у соседей', effects: { wealth: -15, stability: -5 }, cost: 20, hydro: 30, hint: 'Зависимость' },
-        ]},
-    ];
-
-    // Achievement definitions (for display before DB loads)
-    const ACHIEVEMENT_DEFS = {
-      first_win: { name: 'Первая победа', icon: '🏆', desc: 'Выиграйте первую игру' },
-      parliamentarian: { name: 'Парламентарий', icon: '🏛️', desc: 'Победите за демократию' },
-      president: { name: 'Президент', icon: '🦅', desc: 'Победите за республику' },
-      monarch: { name: 'Монарх', icon: '👑', desc: 'Победите за монархию' },
-      dictator: { name: 'Диктатор', icon: '⚔️', desc: 'Победите за диктатуру' },
-      utopia: { name: 'Утопия', icon: '😊', desc: '95% счастья' },
-      prosperity: { name: 'Процветание', icon: '💰', desc: '95% богатства' },
-      survivor: { name: 'Выживший', icon: '💪', desc: 'Победа на сложном' },
-      speedrun: { name: 'Спидраннер', icon: '⚡', desc: 'Победа за 10 ходов' },
-      perfectionist: { name: 'Перфекционист', icon: '⭐', desc: '80%+ везде' },
-      high_score: { name: 'Рекордсмен', icon: '🎯', desc: '100+ очков' },
-      veteran: { name: 'Ветеран', icon: '🎖️', desc: '10 игр' },
-    };
-
-    // ============================================
-    // UI COMPONENTS
-    // ============================================
-    const Spinner = ({ size = 'md' }) => {
-      const sizes = { sm: 'w-5 h-5', md: 'w-8 h-8', lg: 'w-12 h-12' };
-      return (
-        <div className="flex justify-center py-4">
-          <div className={`${sizes[size]} border-4 border-amber-500 border-t-transparent rounded-full animate-spin`}></div>
-        </div>
-      );
-    };
-
-    const Toast = ({ message, type = 'info', onClose }) => {
-      useEffect(() => {
-        const timer = setTimeout(onClose, 3000);
-        return () => clearTimeout(timer);
-      }, [onClose]);
-
-      const colors = {
-        success: 'bg-green-900/90 border-green-500 text-green-200',
-        error: 'bg-red-900/90 border-red-500 text-red-200',
-        warning: 'bg-yellow-900/90 border-yellow-500 text-yellow-200',
-        info: 'bg-blue-900/90 border-blue-500 text-blue-200',
-        achievement: 'bg-amber-900/90 border-amber-500 text-amber-200',
-      };
-
-      return (
-        <div className={`toast ${colors[type]} border px-4 py-3 rounded-lg shadow-lg animate-slideUp`}>
-          {message}
-        </div>
-      );
-    };
-
-    const Modal = ({ children, onClose, title }) => (
-      <div className="modal-overlay animate-fadeIn" onClick={onClose}>
-        <div className="bg-slate-800 rounded-xl max-w-md w-full max-h-[85vh] overflow-hidden border border-amber-500/30 animate-slideUp"
-             onClick={e => e.stopPropagation()}>
-          {title && (
-            <div className="flex justify-between items-center p-4 border-b border-slate-700">
-              <h2 className="text-lg font-display font-bold text-amber-400">{title}</h2>
-              <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
-            </div>
-          )}
-          <div className="p-4 overflow-y-auto max-h-[calc(85vh-60px)]">
-            {children}
-          </div>
-        </div>
-      </div>
-    );
-
-    const StatBar = ({ label, value, icon, color }) => (
-      <div className="mb-2">
-        <div className="flex justify-between text-xs mb-1">
-          <span className="text-amber-100/80">{icon} {label}</span>
-          <span className={`font-bold ${value < 30 ? 'text-red-400' : value > 70 ? 'text-green-400' : 'text-amber-300'}`}>
-            {Math.round(value)}%
-          </span>
-        </div>
-        <div className="h-2 bg-slate-900 rounded overflow-hidden border border-amber-900/30">
-          <div className={`h-full ${color} transition-all duration-500`} 
-               style={{ width: `${Math.min(100, Math.max(0, value))}%` }}/>
-        </div>
-      </div>
-    );
-
-    const StarBackground = () => {
-      const stars = useMemo(() => 
-        Array.from({ length: 50 }, (_, i) => ({
-          id: i,
-          left: Math.random() * 100,
-          top: Math.random() * 100,
-          size: Math.random() * 2 + 1,
-          delay: Math.random() * 3
-        })), []);
-
-      return (
-        <div className="star-bg">
-          {stars.map(s => (
-            <div key={s.id} className="star animate-pulse" style={{
-              left: `${s.left}%`, top: `${s.top}%`,
-              width: `${s.size}px`, height: `${s.size}px`,
-              animationDelay: `${s.delay}s`
-            }}/>
-          ))}
-        </div>
-      );
-    };
-
-    // ============================================
-    // AUTH MODAL
-    // ============================================
-    const AuthModal = ({ onClose, initialMode = 'login' }) => {
-      const { signIn, signUp, signInWithGoogle } = useAuth();
-      const [mode, setMode] = useState(initialMode);
-      const [email, setEmail] = useState('');
-      const [password, setPassword] = useState('');
-      const [username, setUsername] = useState('');
-      const [error, setError] = useState('');
-      const [loading, setLoading] = useState(false);
-      const [success, setSuccess] = useState('');
-
-      const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setLoading(true);
-
-        try {
-          if (mode === 'login') {
-            await signIn(email, password);
-            onClose();
-          } else {
-            if (!username.trim()) throw new Error('Введите имя пользователя');
-            if (password.length < 6) throw new Error('Пароль минимум 6 символов');
-            await signUp(email, password, username.trim());
-            setSuccess('Проверьте почту для подтверждения!');
-          }
-        } catch (err) {
-          setError(err.message || 'Ошибка авторизации');
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      return (
-        <Modal onClose={onClose} title={mode === 'login' ? '🔑 Вход' : '📝 Регистрация'}>
-          {error && <div className="bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm">{error}</div>}
-          {success && <div className="bg-green-900/50 text-green-300 p-3 rounded-lg mb-4 text-sm">{success}</div>}
-
-          <form onSubmit={handleSubmit} className="space-y-3">
-            {mode === 'register' && (
-              <div>
-                <label className="text-xs text-gray-400 block mb-1">Имя пользователя</label>
-                <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-amber-500 outline-none"
-                  placeholder="Ваш никнейм"/>
-              </div>
-            )}
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-amber-500 outline-none"
-                placeholder="email@example.com"/>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 block mb-1">Пароль</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:border-amber-500 outline-none"
-                placeholder="Минимум 6 символов"/>
-            </div>
-            
-            <button type="submit" disabled={loading}
-              className="w-full py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-600 rounded-lg font-bold transition">
-              {loading ? <Spinner size="sm" /> : mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-            </button>
-          </form>
-
-          <div className="my-4 flex items-center gap-3">
-            <div className="flex-1 h-px bg-slate-600"></div>
-            <span className="text-xs text-gray-500">или</span>
-            <div className="flex-1 h-px bg-slate-600"></div>
-          </div>
-
-          <button onClick={signInWithGoogle}
-            className="w-full py-3 bg-white hover:bg-gray-100 text-slate-900 rounded-lg font-bold transition flex items-center justify-center gap-2">
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-            </svg>
-            Войти через Google
-          </button>
-
-          <p className="mt-4 text-center text-sm text-gray-400">
-            {mode === 'login' ? 'Нет аккаунта? ' : 'Уже есть аккаунт? '}
-            <button onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setSuccess(''); }}
-              className="text-amber-400 hover:underline">
-              {mode === 'login' ? 'Регистрация' : 'Войти'}
-            </button>
-          </p>
-        </Modal>
-      );
-    };
-
-    // ============================================
-    // PROFILE MODAL
-    // ============================================
-    const ProfileModal = ({ onClose }) => {
-      const { user, profile, signOut, refreshProfile } = useAuth();
-      const [history, setHistory] = useState([]);
-      const [achievements, setAchievements] = useState([]);
-      const [loading, setLoading] = useState(true);
-      const [tab, setTab] = useState('stats');
-
-      useEffect(() => {
-        if (user) {
-          Promise.all([
-            db.getGameHistory(user.id, 10),
-            db.getUserAchievements(user.id)
-          ]).then(([historyRes, achievementsRes]) => {
-            setHistory(historyRes.data);
-            setAchievements(achievementsRes.data);
-            setLoading(false);
-          });
-        }
-      }, [user]);
-
-      const handleSignOut = async () => {
-        await signOut();
-        onClose();
-      };
-
-      if (!profile) return null;
-
-      const winRate = profile.total_games > 0 
-        ? Math.round(profile.total_wins / profile.total_games * 100) 
-        : 0;
-
-      return (
-        <Modal onClose={onClose} title="👤 Профиль">
-          {/* User Info */}
-          <div className="text-center mb-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-amber-700 rounded-full flex items-center justify-center text-4xl mx-auto mb-2 shadow-lg">
-              {profile.display_name?.[0]?.toUpperCase() || profile.username?.[0]?.toUpperCase() || '👤'}
-            </div>
-            <h3 className="text-xl font-bold text-amber-300">{profile.display_name || profile.username}</h3>
-            <p className="text-sm text-gray-400">{user?.email}</p>
-            {profile.is_premium && (
-              <span className="inline-block mt-2 px-3 py-1 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 text-xs font-bold rounded-full">
-                ⭐ PREMIUM
-              </span>
-            )}
-          </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-amber-400">{profile.total_games}</p>
-              <p className="text-xs text-gray-400">Игр</p>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-400">{winRate}%</p>
-              <p className="text-xs text-gray-400">Побед</p>
-            </div>
-            <div className="bg-slate-700/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-cyan-400">{profile.highest_score}</p>
-              <p className="text-xs text-gray-400">Рекорд</p>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-2 mb-3">
-            <button onClick={() => setTab('stats')}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${tab === 'stats' ? 'bg-amber-600' : 'bg-slate-700'}`}>
-              📊 История
-            </button>
-            <button onClick={() => setTab('achievements')}
-              className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${tab === 'achievements' ? 'bg-amber-600' : 'bg-slate-700'}`}>
-              🏆 Достижения
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          {loading ? <Spinner /> : (
-            <div className="max-h-48 overflow-y-auto">
-              {tab === 'stats' && (
-                <div className="space-y-1">
-                  {history.length === 0 ? (
-                    <p className="text-gray-400 text-sm text-center py-4">Ещё нет игр</p>
-                  ) : history.map(g => (
-                    <div key={g.id} className="flex justify-between items-center bg-slate-700/30 rounded-lg p-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span>{SYSTEMS[g.political_system]?.icon || '🏛️'}</span>
-                        <span className="text-gray-300">{g.planet_name}</span>
-                      </div>
-                      <span className={g.is_victory ? 'text-green-400' : 'text-red-400'}>
-                        {g.is_victory ? `🏆 ${g.score}` : '💔'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {tab === 'achievements' && (
-                <div className="grid grid-cols-3 gap-2">
-                  {achievements.length === 0 ? (
-                    <p className="col-span-3 text-gray-400 text-sm text-center py-4">Нет достижений</p>
-                  ) : achievements.map(ua => (
-                    <div key={ua.achievement_id} className="bg-amber-900/30 rounded-lg p-2 text-center">
-                      <span className="text-2xl">{ua.achievements?.icon || '🏆'}</span>
-                      <p className="text-xs text-amber-200 mt-1">{ua.achievements?.name}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-2 mt-4">
-            <button onClick={onClose} className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">
-              Закрыть
-            </button>
-            <button onClick={handleSignOut} className="flex-1 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg transition">
-              Выйти
-            </button>
-          </div>
-        </Modal>
-      );
-    };
-
-    // ============================================
-    // LEADERBOARD MODAL
-    // ============================================
-    const LeaderboardModal = ({ onClose }) => {
-      const [leaders, setLeaders] = useState([]);
-      const [loading, setLoading] = useState(true);
-
-      useEffect(() => {
-        db.getLeaderboard(30).then(({ data }) => {
-          setLeaders(data);
-          setLoading(false);
-        });
-      }, []);
-
-      return (
-        <Modal onClose={onClose} title="🏆 Таблица лидеров">
-          {loading ? <Spinner /> : (
-            <div className="space-y-2">
-              {leaders.length === 0 ? (
-                <p className="text-center text-gray-400 py-8">Пока нет результатов.<br/>Станьте первым!</p>
-              ) : leaders.map((p, i) => (
-                <div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg transition ${
-                  i < 3 ? 'bg-gradient-to-r from-amber-900/40 to-transparent' : 'bg-slate-700/30'
-                }`}>
-                  <span className="text-2xl font-bold w-8 text-center">
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-amber-100 truncate">
-                      {p.display_name || p.username || 'Игрок'}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {p.total_wins}/{p.total_games} побед • {p.win_rate || 0}%
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-amber-400">{p.highest_score}</p>
-                    <p className="text-xs text-gray-500">очков</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Modal>
-      );
-    };
-
-    // ============================================
-    // PREMIUM MODAL (Stripe Integration)
-    // ============================================
-    const PremiumModal = ({ onClose }) => {
-      const { user, profile, refreshProfile } = useAuth();
-      const [loading, setLoading] = useState(false);
-      const [promo, setPromo] = useState('');
-      const [error, setError] = useState('');
-
-      const handlePurchase = async () => {
-        if (!user) {
-          setError('Сначала войдите в аккаунт');
-          return;
-        }
-
-        setLoading(true);
-        setError('');
-
-        try {
-          const response = await fetch('/.netlify/functions/create-checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userId: user.id,
-              userEmail: user.email,
-              promo: promo.trim() || undefined,
-            }),
-          });
-
-          const data = await response.json();
-
-          if (data.error) {
-            setError(data.error);
-          } else if (data.url) {
-            window.location.href = data.url;
-          }
-        } catch (err) {
-          setError('Ошибка подключения к платёжной системе');
-          console.error(err);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const features = [
-        { icon: '🏛️', text: '6 политических систем (вместо 2)' },
-        { icon: '🎖️', text: 'Все достижения и награды' },
-        { icon: '📊', text: 'Расширенная статистика' },
-        { icon: '🚫', text: 'Без рекламы' },
-        { icon: '💾', text: 'Облачные сохранения' },
-        { icon: '🎓', text: 'Classroom Mode (скоро)' },
-      ];
-
-      return (
-        <Modal onClose={onClose} title="⭐ Premium">
-          {/* Price */}
-          <div className="text-center mb-4">
-            <div className="text-4xl font-bold text-amber-400 mb-1">{PREMIUM_PRICE}</div>
-            <p className="text-sm text-gray-400">Отменить можно в любое время</p>
-          </div>
-
-          {/* Features */}
-          <div className="bg-slate-700/30 rounded-lg p-4 mb-4">
-            <h3 className="font-bold text-amber-200 mb-3">Что включено:</h3>
-            <div className="space-y-2">
-              {features.map((f, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="text-xl">{f.icon}</span>
-                  <span className="text-gray-300">{f.text}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Promo code */}
-          <div className="mb-4">
-            <label className="text-xs text-gray-400 block mb-1">🎁 Промокод (если есть)</label>
-            <input
-              type="text"
-              value={promo}
-              onChange={(e) => setPromo(e.target.value.toUpperCase())}
-              placeholder="TEACHER50"
-              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-amber-500 outline-none uppercase"
-            />
-          </div>
-
-          {/* Error */}
-          {error && (
-            <div className="bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Buy button */}
-          <button
-            onClick={handlePurchase}
-            disabled={loading || !user}
-            className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 disabled:from-slate-600 disabled:to-slate-600 text-slate-900 font-bold rounded-lg transition flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <Spinner size="sm" />
-            ) : (
-              <>
-                <span>💳</span>
-                <span>Оформить подписку</span>
-              </>
-            )}
-          </button>
-
-          {!user && (
-            <p className="text-center text-xs text-gray-400 mt-3">
-              Войдите в аккаунт для оформления подписки
-            </p>
-          )}
-
-          {/* Security note */}
-          <p className="text-center text-xs text-gray-500 mt-4">
-            🔒 Безопасная оплата через Stripe
-          </p>
-        </Modal>
-      );
-    };
-
-    // ============================================
-    // MAIN GAME COMPONENT
-    // ============================================
-    function Game() {
-      const { user, profile, loading: authLoading, initialized } = useAuth();
-      
-      // Game state
-      const [phase, setPhase] = useState('title');
-      const [turn, setTurn] = useState(1);
-      const [maxTurns, setMaxTurns] = useState(15);
-      const [difficulty, setDifficulty] = useState('normal');
-      const [stats, setStats] = useState({ happiness: 60, wealth: 50, stability: 70 });
-      const [hydrobite, setHydrobite] = useState(100);
-      const [budget, setBudget] = useState({ defence: 20, education: 20, health: 20, infra: 20, welfare: 20 });
-      const [system, setSystem] = useState('parliamentary');
-      const [planet, setPlanet] = useState('Новая Терра');
-      const [event, setEvent] = useState(null);
-      const [usedEvents, setUsedEvents] = useState([]);
-      const [gameStartTime, setGameStartTime] = useState(null);
-      const [finalScore, setFinalScore] = useState(0);
-      
-      // UI state
-      const [showAuth, setShowAuth] = useState(false);
-      const [showProfile, setShowProfile] = useState(false);
-      const [showLeaderboard, setShowLeaderboard] = useState(false);
-      const [showPremium, setShowPremium] = useState(false);
-      const [toast, setToast] = useState(null);
-      const [newAchievements, setNewAchievements] = useState([]);
-
-      // Check URL params for payment result
-      useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('success') === 'true') {
-          // Clear URL first to prevent loops
-          window.history.replaceState({}, '', '/');
-          setToast({ message: '✅ Оплата прошла успешно! Добро пожаловать в Premium!', type: 'success' });
-          // Reload page after 2 seconds to refresh profile
-          setTimeout(() => window.location.reload(), 2000);
-        } else if (params.get('canceled') === 'true') {
-          window.history.replaceState({}, '', '/');
-          setToast({ message: 'Оплата отменена', type: 'warning' });
-        }
-      }, []);
-
-      const sys = SYSTEMS[system];
-      const diff = DIFFICULTIES[difficulty];
-      const totalBudget = Object.values(budget).reduce((a, b) => a + b, 0);
-      const remaining = hydrobite - totalBudget;
-      const isPremium = profile?.is_premium || false;
-
-      // Show toast message
-      const showToast = useCallback((message, type = 'info') => {
-        setToast({ message, type });
-      }, []);
-
-      // Calculate score
-      const calculateScore = useCallback((s, t, isVictory) => {
-        let score = Math.floor((s.happiness + s.wealth + s.stability) / 3);
-        score += t * 2;
-        if (isVictory) score += 20;
-        if (difficulty === 'hard') score += 15;
-        if (difficulty === 'easy') score -= 10;
-        return Math.max(0, score);
-      }, [difficulty]);
-
-      // Check and unlock achievements
-      const checkAchievements = useCallback(async (gameData) => {
-        if (!user) return [];
-        
-        const unlocked = [];
-        const checks = [
-          { id: 'first_win', condition: gameData.isVictory && profile?.total_wins === 0 },
-          { id: 'parliamentarian', condition: gameData.isVictory && gameData.system === 'parliamentary' },
-          { id: 'president', condition: gameData.isVictory && gameData.system === 'presidential' },
-          { id: 'monarch', condition: gameData.isVictory && gameData.system === 'monarchy' },
-          { id: 'dictator', condition: gameData.isVictory && gameData.system === 'dictatorship' },
-          { id: 'utopia', condition: gameData.stats.happiness >= 95 },
-          { id: 'prosperity', condition: gameData.stats.wealth >= 95 },
-          { id: 'survivor', condition: gameData.isVictory && gameData.difficulty === 'hard' },
-          { id: 'speedrun', condition: gameData.isVictory && gameData.turn <= 10 },
-          { id: 'perfectionist', condition: gameData.isVictory && gameData.stats.happiness >= 80 && gameData.stats.wealth >= 80 && gameData.stats.stability >= 80 },
-          { id: 'high_score', condition: gameData.score >= 100 },
-          { id: 'veteran', condition: (profile?.total_games || 0) >= 9 },
-        ];
-
-        for (const check of checks) {
-          if (check.condition) {
-            const { error } = await db.unlockAchievement(user.id, check.id);
-            if (!error) unlocked.push(ACHIEVEMENT_DEFS[check.id]);
-          }
-        }
-
-        return unlocked;
-      }, [user, profile]);
-
-      // End game and save results
-      const endGame = useCallback(async (isVictory, victoryType = null) => {
-        const score = calculateScore(stats, turn, isVictory);
-        setFinalScore(score);
-        
-        const duration = gameStartTime ? Math.floor((Date.now() - gameStartTime) / 1000) : 0;
-
-        // Save to database if logged in
-        if (user) {
-          const gameData = {
-            planet, system, difficulty, maxTurns, turn,
-            stats, hydrobite, isVictory, victoryType, score, duration
-          };
-          
-          await db.saveGameResult(user.id, gameData);
-          
-          // Check achievements
-          const unlocked = await checkAchievements({ ...gameData, score });
-          if (unlocked.length > 0) {
-            setNewAchievements(unlocked);
-          }
-        }
-
-        setPhase(isVictory ? 'victory' : 'gameover');
-      }, [user, planet, system, difficulty, maxTurns, turn, stats, hydrobite, gameStartTime, calculateScore, checkAchievements]);
-
-      // Start new game
-      const startGame = useCallback(() => {
-        if (!isPremium && SYSTEMS[system].premium) {
-          showToast('🔒 Эта система требует Premium!', 'warning');
-          return;
-        }
-
-        const d = DIFFICULTIES[difficulty];
-        const s = SYSTEMS[system];
-        
-        setStats({
-          happiness: Math.max(10, Math.min(90, 60 + d.bonus - (s.traits.startPenalty || 0))),
-          wealth: Math.max(10, Math.min(90, 50 + d.bonus)),
-          stability: Math.max(10, Math.min(90, 70 + d.bonus + s.traits.stabilityBonus))
-        });
-        setHydrobite(100 + d.hydroBonus);
-        setTurn(1);
-        setBudget({ defence: 20, education: 20, health: 20, infra: 20, welfare: 20 });
-        setUsedEvents([]);
-        setGameStartTime(Date.now());
-        setNewAchievements([]);
-        setPhase('playing');
-      }, [system, difficulty, isPremium, showToast]);
-
-      // Process turn
-      const processTurn = useCallback(() => {
-        if (remaining < 0) {
-          showToast('❌ Бюджет превышен!', 'error');
-          return;
-        }
-
-        // Parliament check
-        if (sys.traits.needsApproval && stats.happiness < sys.traits.threshold) {
-          if (Math.random() > 0.4) {
-            showToast('🏛️ Парламент отклонил бюджет!', 'warning');
-            return;
-          }
-        }
-
-        // Referendum check for direct democracy
-        if (sys.traits.referendumChance && Math.random() < sys.traits.referendumChance) {
-          showToast('🗳️ Референдум изменил приоритеты!', 'info');
-        }
-
-        const d = DIFFICULTIES[difficulty];
-        let changes = {
-          happiness: (budget.welfare * 0.35) + (budget.health * 0.25) + (budget.education * 0.15) - 12 - sys.traits.happinessDecay,
-          wealth: (budget.infra * 0.4) + (budget.education * 0.25) - 10 + sys.traits.wealthBonus,
-          stability: (budget.defence * 0.35) + (budget.infra * 0.1) - 5,
-        };
-
-        // Apply difficulty modifier to negative changes
-        Object.keys(changes).forEach(k => {
-          if (changes[k] < 0) changes[k] *= d.severity;
-        });
-
-        const newStats = {
-          happiness: Math.max(0, Math.min(100, stats.happiness + changes.happiness)),
-          wealth: Math.max(0, Math.min(100, stats.wealth + changes.wealth)),
-          stability: Math.max(0, Math.min(100, stats.stability + changes.stability)),
-        };
-
-        setStats(newStats);
-        setHydrobite(Math.floor(80 + newStats.wealth * 0.3 + d.hydroBonus * 0.5));
-
-        // Get next event
-        let available = EVENTS.filter(e => !usedEvents.includes(e.id));
-        if (available.length === 0) {
-          setUsedEvents([]);
-          available = EVENTS;
-        }
-        const nextEvent = available[Math.floor(Math.random() * available.length)];
-        setEvent(nextEvent);
-        setUsedEvents(prev => [...prev, nextEvent.id]);
-        setPhase('event');
-      }, [remaining, sys, stats, difficulty, budget, usedEvents, showToast]);
-
-      // Handle event choice
-      const handleChoice = useCallback((choice) => {
-        const d = DIFFICULTIES[difficulty];
-        let newStats = { ...stats };
-
-        Object.entries(choice.effects).forEach(([k, v]) => {
-          if (newStats[k] !== undefined) {
-            const effectValue = v < 0 ? v * d.severity : v;
-            newStats[k] = Math.max(0, Math.min(100, newStats[k] + effectValue));
-          }
-        });
-
-        let newHydro = hydrobite - choice.cost + (choice.hydro || 0);
-        setHydrobite(Math.max(0, newHydro));
-        setStats(newStats);
-
-        // Check for rebellion/coup
-        if (sys.traits.rebellionRisk && newStats.happiness < sys.traits.rebellionRisk && Math.random() < 0.3) {
-          showToast('👑 Народное восстание!', 'error');
-          setTimeout(() => endGame(false), 1000);
-          return;
-        }
-        if (sys.traits.coupRisk && newStats.stability < sys.traits.coupRisk && Math.random() < 0.3) {
-          showToast('⚔️ Военный переворот!', 'error');
-          setTimeout(() => endGame(false), 1000);
-          return;
-        }
-
-        // Check game over conditions
-        if (newStats.stability <= 0 || newStats.happiness <= 0) {
-          endGame(false);
-          return;
-        }
-
-        // Check victory conditions
-        if (turn >= maxTurns) {
-          endGame(true, 'survival');
-          return;
-        }
-        if (newStats.happiness >= 95) {
-          endGame(true, 'utopia');
-          return;
-        }
-        if (newStats.wealth >= 95) {
-          endGame(true, 'prosperity');
-          return;
-        }
-
-        setTurn(t => t + 1);
-        setEvent(null);
-        setPhase('playing');
-      }, [difficulty, stats, hydrobite, sys, turn, maxTurns, endGame, showToast]);
-
-      // Budget handler
-      const handleBudget = useCallback((sector, val) => {
-        setBudget(prev => ({ ...prev, [sector]: Math.max(0, Math.min(50, parseInt(val) || 0)) }));
-      }, []);
-
-      // ========== LOADING ==========
-      if (!initialized || authLoading) {
-        return (
-          <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-            <div className="text-center">
-              <Spinner size="lg" />
-              <p className="text-amber-400 mt-4 font-display">Загрузка...</p>
-            </div>
-          </div>
-        );
-      }
-
-      // ========== TITLE SCREEN ==========
-      if (phase === 'title') {
-        return (
-          <div className="min-h-screen bg-slate-950 text-white p-4 relative">
-            <StarBackground />
-            
-            <div className="max-w-md mx-auto pt-4 relative z-10">
-              {/* Header with auth */}
-              <div className="flex justify-between items-center mb-4">
-                <div className="flex gap-2">
-                  <button onClick={() => setShowLeaderboard(true)} 
-                    className="p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700 transition">
-                    🏆
-                  </button>
-                  {!isPremium && (
-                    <button onClick={() => setShowPremium(true)} 
-                      className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg hover:from-amber-400 hover:to-yellow-400 transition text-sm font-bold">
-                      ⭐ Premium
-                    </button>
-                  )}
-                </div>
-                
-                {user ? (
-                  <button onClick={() => setShowProfile(true)}
-                    className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-full hover:bg-slate-700 transition">
-                    <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center text-xs font-bold">
-                      {profile?.display_name?.[0]?.toUpperCase() || '👤'}
-                    </div>
-                    <span className="text-sm text-amber-300">{profile?.display_name || 'Профиль'}</span>
-                    {profile?.is_premium && <span className="text-amber-400">⭐</span>}
-                  </button>
-                ) : (
-                  <button onClick={() => setShowAuth(true)}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-full text-sm font-bold transition">
-                    Войти
-                  </button>
-                )}
-              </div>
-
-              {/* Title */}
-              <div className="text-center mb-6">
-                <h1 className="text-4xl sm:text-5xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
-                <p className="text-amber-200/60 text-sm tracking-widest">ОБРАЗОВАТЕЛЬНАЯ ИГРА О ПОЛИТИКЕ</p>
-              </div>
-
-              {/* Game settings */}
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="text-sm text-gray-400 block mb-1">🌍 Название планеты</label>
-                  <input type="text" value={planet} onChange={e => setPlanet(e.target.value || 'Новая Терра')}
-                    className="w-full bg-slate-900/80 border border-amber-500/30 rounded-lg px-4 py-3 text-center text-amber-300 focus:border-amber-500 outline-none transition"/>
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 block mb-1">📊 Сложность</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {Object.entries(DIFFICULTIES).map(([key, d]) => (
-                      <button key={key} onClick={() => setDifficulty(key)}
-                        className={`py-3 rounded-lg border text-sm transition ${
-                          difficulty === key ? 'border-amber-500 bg-amber-500/20 text-amber-300' : 'border-slate-600 text-gray-400 hover:border-slate-500'
-                        }`}>
-                        {d.icon} {d.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 block mb-1">⏱️ Длина игры: {maxTurns} лет</label>
-                  <input type="range" min="10" max="30" step="5" value={maxTurns} onChange={e => setMaxTurns(parseInt(e.target.value))}
-                    className="w-full" style={{ background: `linear-gradient(90deg, #d97706 ${(maxTurns-10)/20*100}%, #1e293b ${(maxTurns-10)/20*100}%)` }}/>
-                </div>
-
-                <div>
-                  <label className="text-sm text-gray-400 block mb-1">🏛️ Политическая система</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {Object.values(SYSTEMS).map(s => (
-                      <button key={s.id} onClick={() => setSystem(s.id)}
-                        className={`p-3 rounded-lg border text-left transition ${
-                          system === s.id ? 'border-amber-500 bg-amber-500/10' : 'border-slate-600 hover:border-slate-500'
-                        } ${s.premium && !isPremium ? 'opacity-60' : ''}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xl">{s.icon}</span>
-                          <span className="text-sm font-bold text-amber-100">{s.name.split(' ')[0]}</span>
-                        </div>
-                        <p className="text-xs text-gray-400 line-clamp-1">{s.desc}</p>
-                        {s.premium && !isPremium && (
-                          <span className="text-xs text-amber-400 mt-1 inline-block">⭐ Premium</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Start button */}
-              <button onClick={startGame}
-                className="w-full py-4 bg-gradient-to-b from-amber-500 to-amber-700 hover:from-amber-400 hover:to-amber-600 text-slate-900 font-bold rounded-lg text-lg glow-amber transition">
-                🚀 НАЧАТЬ ИГРУ
-              </button>
-
-              {!user && (
-                <p className="text-center text-xs text-gray-500 mt-4">
-                  💡 <button onClick={() => setShowAuth(true)} className="text-amber-400 hover:underline">Войдите</button>, чтобы сохранять результаты и соревноваться в рейтинге
-                </p>
-              )}
-            </div>
-
-            {/* Modals */}
-            {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-            {showProfile && <ProfileModal onClose={() => setShowProfile(false)} />}
-            {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
-            {showPremium && <PremiumModal onClose={() => setShowPremium(false)} />}
-            {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-          </div>
-        );
-      }
-
-      // ========== VICTORY ==========
-      if (phase === 'victory') {
-        return (
-          <div className="min-h-screen bg-gradient-to-b from-slate-950 via-amber-950/20 to-slate-950 text-white flex flex-col items-center justify-center p-4 relative">
-            <StarBackground />
-            <div className="relative z-10 text-center animate-slideUp">
-              <div className="text-8xl mb-4 animate-pulse">🏆</div>
-              <h1 className="text-4xl font-display font-bold text-amber-400 mb-2">ПОБЕДА!</h1>
-              <p className="text-gray-400 mb-2">{sys.icon} {sys.name}</p>
-              <p className="text-gray-500 mb-4">Вы управляли {turn} лет</p>
-              
-              <div className="grid grid-cols-3 gap-3 mb-4 max-w-xs mx-auto">
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <div className="text-xl">😊</div>
-                  <div className="text-lg font-bold text-green-400">{Math.round(stats.happiness)}%</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <div className="text-xl">💰</div>
-                  <div className="text-lg font-bold text-yellow-400">{Math.round(stats.wealth)}%</div>
-                </div>
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <div className="text-xl">⚖️</div>
-                  <div className="text-lg font-bold text-blue-400">{Math.round(stats.stability)}%</div>
-                </div>
-              </div>
-
-              <p className="text-5xl font-bold text-amber-500 mb-6">{finalScore} очков</p>
-
-              {newAchievements.length > 0 && (
-                <div className="mb-6 bg-amber-900/30 rounded-lg p-4 max-w-xs mx-auto">
-                  <p className="text-sm text-amber-300 mb-2">🎉 Новые достижения!</p>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {newAchievements.map(a => (
-                      <div key={a.name} className="bg-slate-800/50 rounded-lg p-2 text-center">
-                        <span className="text-2xl">{a.icon}</span>
-                        <p className="text-xs text-amber-200">{a.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!user && (
-                <p className="text-sm text-gray-400 mb-4">
-                  <button onClick={() => setShowAuth(true)} className="text-amber-400 hover:underline">Войдите</button>, чтобы сохранить результат!
-                </p>
-              )}
-
-              <button onClick={() => { setPhase('title'); setNewAchievements([]); }}
-                className="px-8 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold text-lg transition">
-                ИГРАТЬ СНОВА
-              </button>
-            </div>
-            {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-          </div>
-        );
-      }
-
-      // ========== GAME OVER ==========
-      if (phase === 'gameover') {
-        return (
-          <div className="min-h-screen bg-gradient-to-b from-slate-950 via-red-950/20 to-slate-950 text-white flex flex-col items-center justify-center p-4 relative">
-            <StarBackground />
-            <div className="relative z-10 text-center animate-slideUp">
-              <div className="text-8xl mb-4">💔</div>
-              <h1 className="text-4xl font-display font-bold text-red-400 mb-2">КОНЕЦ ПРАВЛЕНИЯ</h1>
-              <p className="text-gray-400 mb-4">
-                {stats.stability <= 0 ? 'Нестабильность разрушила власть' :
-                 stats.happiness <= 0 ? 'Народ восстал против вас' :
-                 'Ваше правление закончилось'}
-              </p>
-              <p className="text-gray-500 mb-6">Продержались {turn} лет как {sys.leader}</p>
-              <button onClick={() => setPhase('title')}
-                className="px-8 py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold text-lg transition">
-                ПОПРОБОВАТЬ СНОВА
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      // ========== EVENT SCREEN ==========
-      if (phase === 'event' && event) {
-        return (
-          <div className="min-h-screen bg-slate-950 text-white p-4 animate-fadeIn">
-            <div className="max-w-md mx-auto">
-              {/* Header */}
-              <div className="flex justify-between items-center mb-4 bg-slate-900/80 rounded-xl p-3 border border-amber-500/20">
-                <span className="text-amber-400 font-bold">Год {turn}/{maxTurns}</span>
-                <span className="bg-cyan-950/50 px-3 py-1 rounded-lg text-cyan-300 font-bold">◆ {hydrobite}</span>
-              </div>
-
-              {/* Event Card */}
-              <div className="bg-slate-800/90 rounded-xl p-5 border-2 border-amber-500/40 mb-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-5xl">{event.icon}</span>
-                  <div>
-                    <span className="text-xs bg-slate-700 px-2 py-1 rounded text-gray-400">{event.category}</span>
-                    <h2 className="text-xl font-display font-bold text-amber-100 mt-1">{event.title}</h2>
-                  </div>
-                </div>
-                <p className="text-gray-300 mb-5">{event.desc}</p>
-
-                <div className="space-y-3">
-                  {event.choices.map((c, i) => (
-                    <button key={i} onClick={() => handleChoice(c)} disabled={c.cost > hydrobite}
-                      className={`w-full text-left p-4 rounded-lg border transition ${
-                        c.cost > hydrobite ? 'opacity-50 border-slate-700 cursor-not-allowed' : 'border-slate-600 hover:border-amber-500 hover:bg-slate-700/50'
-                      }`}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-amber-100">{c.text}</span>
-                        {c.cost > 0 && <span className="text-xs bg-cyan-900/50 text-cyan-400 px-2 py-1 rounded">-{c.cost}◆</span>}
-                      </div>
-                      {c.hint && <p className="text-xs text-gray-400 mb-2 italic">💡 {c.hint}</p>}
-                      <div className="flex flex-wrap gap-1">
-                        {Object.entries(c.effects).map(([k, v]) => (
-                          <span key={k} className={`text-xs px-2 py-0.5 rounded ${v >= 0 ? 'bg-green-900/40 text-green-400' : 'bg-red-900/40 text-red-400'}`}>
-                            {v > 0 ? '+' : ''}{v} {k === 'happiness' ? '😊' : k === 'wealth' ? '💰' : '⚖️'}
-                          </span>
-                        ))}
-                        {c.hydro && (
-                          <span className={`text-xs px-2 py-0.5 rounded ${c.hydro >= 0 ? 'bg-cyan-900/40 text-cyan-400' : 'bg-orange-900/40 text-orange-400'}`}>
-                            {c.hydro > 0 ? '+' : ''}{c.hydro}◆
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Mini stats */}
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { icon: '😊', val: stats.happiness },
-                  { icon: '💰', val: stats.wealth },
-                  { icon: '⚖️', val: stats.stability }
-                ].map((s, i) => (
-                  <div key={i} className="bg-slate-900/80 rounded-lg p-3 text-center">
-                    <div className="text-xl">{s.icon}</div>
-                    <div className={`font-bold ${s.val < 30 ? 'text-red-400' : s.val > 70 ? 'text-green-400' : 'text-amber-300'}`}>
-                      {Math.round(s.val)}%
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-          </div>
-        );
-      }
-
-      // ========== MAIN GAME SCREEN ==========
-      return (
-        <div className="min-h-screen bg-slate-950 text-white p-4">
-          <div className="max-w-md mx-auto">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4 bg-slate-900/80 rounded-xl p-3 border border-amber-500/20">
-              <div>
-                <h1 className="text-lg font-display font-bold text-amber-400">{planet}</h1>
-                <p className="text-xs text-amber-200/50">{sys.icon} {sys.leader}</p>
-              </div>
-              <div className="text-center">
-                <div className="text-amber-400 font-black text-2xl">ГОД {turn}</div>
-                <div className="text-gray-500 text-xs">из {maxTurns}</div>
-              </div>
-              <div className="bg-cyan-950/50 px-3 py-2 rounded-lg border border-cyan-500/30">
-                <span className="text-xl text-cyan-400">◆</span>
-                <span className="font-black text-xl text-cyan-300 ml-1">{hydrobite}</span>
-              </div>
-            </div>
-
-            {/* Main panels */}
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              {/* Stats */}
-              <div className="bg-slate-800/70 rounded-xl p-4 border border-amber-500/20">
-                <h2 className="text-xs font-bold mb-3 text-amber-200/80">📊 СТАТУС</h2>
-                <StatBar label="Счастье" value={stats.happiness} icon="😊" color="bg-green-500"/>
-                <StatBar label="Богатство" value={stats.wealth} icon="💰" color="bg-yellow-500"/>
-                <StatBar label="Стабильность" value={stats.stability} icon="⚖️" color="bg-blue-500"/>
-                
-                {sys.traits.needsApproval && (
-                  <div className={`mt-2 text-xs p-2 rounded ${
-                    stats.happiness >= sys.traits.threshold ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
-                  }`}>
-                    🏛️ {stats.happiness >= sys.traits.threshold ? 'Парламент одобрит' : 'Нужно >40% счастья'}
-                  </div>
-                )}
-              </div>
-
-              {/* Budget */}
-              <div className="bg-slate-800/70 rounded-xl p-4 border border-amber-500/20">
-                <div className="flex justify-between items-center mb-3">
-                  <h2 className="text-xs font-bold text-amber-200/80">📋 БЮДЖЕТ</h2>
-                  <span className={`text-xs font-bold px-2 py-1 rounded ${
-                    remaining >= 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'
-                  }`}>
-                    {remaining >= 0 ? '+' : ''}{remaining}◆
-                  </span>
-                </div>
-                {SECTORS.map(s => (
-                  <div key={s.id} className="mb-2">
-                    <div className="flex justify-between text-xs mb-0.5">
-                      <span className="text-gray-400">{s.icon}</span>
-                      <span className="text-cyan-400 font-bold">{budget[s.id]}</span>
-                    </div>
-                    <input type="range" min="0" max="50" value={budget[s.id]}
-                      onChange={e => handleBudget(s.id, e.target.value)}
-                      className="w-full"
-                      style={{ background: `linear-gradient(90deg, #d97706 ${budget[s.id]*2}%, #1e293b ${budget[s.id]*2}%)` }}/>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Submit button */}
-            <button onClick={processTurn} disabled={remaining < 0}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition ${
-                remaining >= 0
-                  ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-900 glow-amber'
-                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-              }`}>
-              {sys.traits.needsApproval ? '🏛️ ПОДАТЬ В ПАРЛАМЕНТ' : '✅ УТВЕРДИТЬ БЮДЖЕТ'}
-            </button>
-          </div>
-          {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-        </div>
-      );
+    // ===== LANG CONTEXT =====
+    const LangContext=createContext({lang:'ru',setLang:()=>{},t:(k)=>k});
+    const useLang=()=>useContext(LangContext);
+
+    function LangProvider({children}){
+      const[lang,setLang]=useState(()=>localStorage.getItem('lang')||'');
+      const t=useCallback((path)=>{
+        const keys=path.split('.');let val=T;
+        for(const k of keys){val=val?.[k];if(!val)return path;}
+        return val[lang]||val.ru||path;
+      },[lang]);
+      const changeLang=(l)=>{setLang(l);localStorage.setItem('lang',l);};
+      return(<LangContext.Provider value={{lang,setLang:changeLang,t}}>{children}</LangContext.Provider>);
     }
 
-    // ============================================
-    // APP ROOT
-    // ============================================
-    function App() {
-      return (
-        <AuthProvider>
-          <Game />
-        </AuthProvider>
-      );
+    // ===== UI COMPONENTS =====
+    const Spinner=({size='md'})=>{const s={sm:'w-5 h-5',md:'w-8 h-8',lg:'w-12 h-12'};return(<div className="flex justify-center py-4"><div className={`${s[size]} border-4 border-amber-500 border-t-transparent rounded-full animate-spin`}/></div>);};
+    const Toast=({message,type='info',onClose})=>{useEffect(()=>{const t=setTimeout(onClose,3000);return()=>clearTimeout(t);},[onClose]);const colors={success:'bg-green-900/90 border-green-500 text-green-200',error:'bg-red-900/90 border-red-500 text-red-200',warning:'bg-yellow-900/90 border-yellow-500 text-yellow-200',info:'bg-blue-900/90 border-blue-500 text-blue-200'};return(<div className={`toast ${colors[type]} border px-4 py-3 rounded-lg shadow-lg animate-slideUp`}>{message}</div>);};
+    const Modal=({children,onClose,title})=>(<div className="modal-overlay animate-fadeIn" onClick={onClose}><div className="bg-slate-800 rounded-xl max-w-md w-full max-h-[85vh] overflow-hidden border border-amber-500/30 animate-slideUp" onClick={e=>e.stopPropagation()}>{title&&(<div className="flex justify-between items-center p-4 border-b border-slate-700"><h2 className="text-lg font-display font-bold text-amber-400">{title}</h2><button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button></div>)}<div className="p-4 overflow-y-auto max-h-[calc(85vh-60px)]">{children}</div></div></div>);
+    const StatBar=({label,value,icon,color})=>(<div className="mb-2"><div className="flex justify-between text-xs mb-1"><span className="text-amber-100/80">{icon} {label}</span><span className={`font-bold ${value<30?'text-red-400':value>70?'text-green-400':'text-amber-300'}`}>{Math.round(value)}%</span></div><div className="h-2 bg-slate-900 rounded overflow-hidden border border-amber-900/30"><div className={`h-full ${color} transition-all duration-500`} style={{width:`${Math.min(100,Math.max(0,value))}%`}}/></div></div>);
+    const StarBackground=()=>{const stars=useMemo(()=>Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,top:Math.random()*100,size:Math.random()*2+1,delay:Math.random()*3})),[]);return(<div className="star-bg">{stars.map(s=>(<div key={s.id} className="star animate-pulse" style={{left:`${s.left}%`,top:`${s.top}%`,width:s.size,height:s.size,animationDelay:`${s.delay}s`}}/>))}</div>);};
+
+    // ===== AUTH MODAL =====
+    const AuthModal=({onClose,initialMode='login'})=>{
+      const{signUp,signIn}=useAuth();const{t}=useLang();
+      const[mode,setMode]=useState(initialMode);const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[username,setUsername]=useState('');const[loading,setLoading]=useState(false);const[error,setError]=useState('');const[success,setSuccess]=useState('');
+      const handleSubmit=async(e)=>{e.preventDefault();setLoading(true);setError('');setSuccess('');try{if(mode==='register'){await signUp(email,password,username);setSuccess('Check email!');}else{await signIn(email,password);onClose();}}catch(err){setError(err.message);}setLoading(false);};
+      return(<Modal onClose={onClose} title={mode==='login'?t('ui.login'):t('ui.register')}><form onSubmit={handleSubmit} className="space-y-4">{mode==='register'&&(<input type="text" placeholder={t('ui.username')} value={username} onChange={e=>setUsername(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white" required/>)}<input type="email" placeholder={t('ui.email')} value={email} onChange={e=>setEmail(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white" required/><input type="password" placeholder={t('ui.password')} value={password} onChange={e=>setPassword(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white" required minLength={6}/>{error&&<p className="text-red-400 text-sm">{error}</p>}{success&&<p className="text-green-400 text-sm">{success}</p>}<button type="submit" disabled={loading} className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg font-bold disabled:opacity-50">{loading?'...':mode==='login'?t('ui.login'):t('ui.register')}</button><p className="text-center text-sm text-gray-400">{mode==='login'?<span>No account? <button type="button" onClick={()=>setMode('register')} className="text-amber-400">Register</button></span>:<span>Have account? <button type="button" onClick={()=>setMode('login')} className="text-amber-400">Login</button></span>}</p></form></Modal>);
+    };
+
+    // ===== PROFILE MODAL =====
+    const ProfileModal=({onClose})=>{
+      const{profile,signOut}=useAuth();const{t}=useLang();
+      return(<Modal onClose={onClose} title={t('ui.profile')||'Profile'}><div className="text-center mb-4"><div className="w-16 h-16 bg-amber-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-2">{profile?.display_name?.[0]?.toUpperCase()||'👤'}</div><h3 className="font-bold text-lg text-amber-300">{profile?.display_name||'Player'}</h3>{profile?.is_premium&&<span className="text-amber-400 text-sm">⭐ Premium</span>}</div><div className="space-y-2 text-sm mb-4"><div className="flex justify-between"><span className="text-gray-400">Games:</span><span className="text-amber-300">{profile?.total_games||0}</span></div><div className="flex justify-between"><span className="text-gray-400">Wins:</span><span className="text-amber-300">{profile?.total_wins||0}</span></div><div className="flex justify-between"><span className="text-gray-400">Best:</span><span className="text-amber-300">{profile?.highest_score||0}</span></div></div><div className="flex gap-2"><button onClick={onClose} className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">{t('ui.close')}</button><button onClick={()=>{signOut();onClose();}} className="flex-1 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg">{t('ui.signOut')}</button></div></Modal>);
+    };
+
+    // ===== LEADERBOARD MODAL =====
+    const LeaderboardModal=({onClose})=>{
+      const[leaders,setLeaders]=useState([]);const[loading,setLoading]=useState(true);
+      useEffect(()=>{db.getLeaderboard(20).then(({data})=>{setLeaders(data||[]);setLoading(false);});},[]);
+      return(<Modal onClose={onClose} title="🏆 Leaderboard">{loading?<Spinner/>:(<div className="space-y-2">{leaders.length===0?<p className="text-center text-gray-400 py-8">No results</p>:leaders.map((p,i)=>(<div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg ${i<3?'bg-gradient-to-r from-amber-900/40 to-transparent':'bg-slate-700/30'}`}><span className="text-xl font-bold w-8 text-center">{i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`}</span><div className="flex-1"><p className="font-bold text-amber-100 truncate">{p.display_name||p.username||'Player'}</p><p className="text-xs text-gray-400">{p.total_wins}/{p.total_games}</p></div><p className="text-lg font-bold text-amber-400">{p.highest_score}</p></div>))}</div>)}</Modal>);
+    };
+
+    // ===== PREMIUM MODAL =====
+    const PremiumModal=({onClose})=>{
+      const{user}=useAuth();const{t}=useLang();const[loading,setLoading]=useState(false);const[promo,setPromo]=useState('');const[error,setError]=useState('');
+      const handlePurchase=async()=>{if(!user){setError('Login first');return;}setLoading(true);setError('');try{const res=await fetch('/.netlify/functions/create-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userId:user.id,userEmail:user.email,promo:promo.trim()||undefined})});const data=await res.json();if(data.error)setError(data.error);else if(data.url)window.location.href=data.url;}catch(e){setError('Error');}setLoading(false);};
+      const features=['🏛️ 6 political systems','🏆 All achievements','📊 Extended stats','🚫 No ads','💾 Cloud saves'];
+      return(<Modal onClose={onClose} title="⭐ Premium"><div className="text-center mb-4"><div className="text-4xl font-bold text-amber-400 mb-1">{t('ui.premiumPrice')}</div></div><div className="bg-slate-700/30 rounded-lg p-4 mb-4 space-y-2">{features.map((f,i)=>(<div key={i} className="text-gray-300">{f}</div>))}</div><input type="text" placeholder="Promo code" value={promo} onChange={e=>setPromo(e.target.value)} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white mb-4"/>{error&&<p className="text-red-400 text-sm mb-2">{error}</p>}<button onClick={handlePurchase} disabled={loading} className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg font-bold disabled:opacity-50">{loading?'...':'Subscribe'}</button></Modal>);
+    };
+
+    // ===== MAIN GAME =====
+    function Game(){
+      const{user,profile,loading:authLoading,initialized}=useAuth();
+      const{lang,setLang,t}=useLang();
+
+      const[phase,setPhase]=useState('lang');
+      const[turn,setTurn]=useState(1);
+      const[maxTurns,setMaxTurns]=useState(15);
+      const[difficulty,setDifficulty]=useState('normal');
+      const[stats,setStats]=useState({happiness:60,wealth:50,stability:70});
+      const[hydrobite,setHydrobite]=useState(100);
+      const[budget,setBudget]=useState({defence:20,education:20,health:20,infra:20,welfare:20});
+      const[system,setSystem]=useState('parliamentary');
+      const[planetId,setPlanetId]=useState('terranova');
+      const[event,setEvent]=useState(null);
+      const[eventQueue,setEventQueue]=useState([]);
+      const[usedEvents,setUsedEvents]=useState([]);
+      const[finalScore,setFinalScore]=useState(0);
+      const[victoryType,setVictoryType]=useState(null);
+      const[eventsPerTurn,setEventsPerTurn]=useState(1);
+      const[targetHappiness,setTargetHappiness]=useState(70);
+      const[targetWealth,setTargetWealth]=useState(70);
+      const[targetStability,setTargetStability]=useState(70);
+      const[showAdvanced,setShowAdvanced]=useState(false);
+
+      const[showAuth,setShowAuth]=useState(false);
+      const[showProfile,setShowProfile]=useState(false);
+      const[showLeaderboard,setShowLeaderboard]=useState(false);
+      const[showPremium,setShowPremium]=useState(false);
+      const[toast,setToast]=useState(null);
+      const[introStep,setIntroStep]=useState(0);
+
+      const sys=SYSTEMS[system];
+      const planet=PLANETS[planetId];
+      const diff=DIFFICULTIES[difficulty];
+      const totalBudget=Object.values(budget).reduce((a,b)=>a+b,0);
+      const remaining=hydrobite-totalBudget;
+      const isPremium=profile?.is_premium||false;
+
+      useEffect(()=>{
+        const params=new URLSearchParams(window.location.search);
+        if(params.get('success')==='true'){window.history.replaceState({},'','/');setToast({message:'✅ Payment successful!',type:'success'});setTimeout(()=>window.location.reload(),2000);}
+        else if(params.get('canceled')==='true'){window.history.replaceState({},'','/');setToast({message:'Payment canceled',type:'warning'});}
+      },[]);
+
+      useEffect(()=>{if(lang)setPhase('title');},[lang]);
+
+      const showToast=useCallback((message,type='info')=>setToast({message,type}),[]);
+
+      const calculateScore=useCallback((s,t,isVictory)=>{
+        let score=Math.floor((s.happiness+s.wealth+s.stability)/3);
+        score+=t*2;if(isVictory)score+=20;
+        if(difficulty==='hard')score+=15;if(difficulty==='easy')score-=10;
+        return Math.max(0,score);
+      },[difficulty]);
+
+      const endGame=useCallback(async(isVictory,vType=null)=>{
+        const score=calculateScore(stats,turn,isVictory);
+        setFinalScore(score);setVictoryType(vType);
+        if(user){
+          const gameData={planet:T.planets[planetId].name[lang],system,difficulty,maxTurns,turn,stats,hydrobite,isVictory,victoryType:vType,score,duration:0};
+          await db.saveGameResult(user.id,gameData);
+        }
+        setPhase(isVictory?'victory':'gameover');
+      },[user,planetId,system,difficulty,maxTurns,turn,stats,hydrobite,lang,calculateScore]);
+
+      const startGame=useCallback(()=>{
+        if(!isPremium&&SYSTEMS[system].premium){showToast('🔒 Premium required!','warning');return;}
+        const d=DIFFICULTIES[difficulty];const p=PLANETS[planetId];const s=SYSTEMS[system];
+        setStats({happiness:Math.max(10,Math.min(90,p.stats.happiness+d.bonus-(s.traits.startPenalty||0))),wealth:Math.max(10,Math.min(90,p.stats.wealth+d.bonus)),stability:Math.max(10,Math.min(90,p.stats.stability+d.bonus+s.traits.stabilityBonus))});
+        setHydrobite(100+d.hydroBonus);setTurn(1);setBudget({defence:20,education:20,health:20,infra:20,welfare:20});setUsedEvents([]);setEventQueue([]);setPhase('playing');
+      },[system,difficulty,planetId,isPremium,showToast]);
+
+      const getRandomEvents=useCallback((count)=>{
+        const general=[...EVENTS.general];const specific=EVENTS[system]||[];const all=[...general,...specific];
+        let available=all.filter(e=>!usedEvents.includes(e.id));if(available.length<count){setUsedEvents([]);available=all;}
+        const selected=[];for(let i=0;i<count&&available.length>0;i++){const idx=Math.floor(Math.random()*available.length);selected.push(available[idx]);available.splice(idx,1);}
+        return selected;
+      },[system,usedEvents]);
+
+      const processTurn=useCallback(()=>{
+        if(remaining<0){showToast('❌ Budget exceeded!','error');return;}
+        if(sys.traits.needsApproval&&stats.happiness<sys.traits.threshold){if(Math.random()>0.4){showToast('🏛️ Parliament rejected!','warning');return;}}
+        if(sys.traits.referendumChance&&Math.random()<sys.traits.referendumChance){showToast('🗳️ Referendum!','info');}
+
+        const d=DIFFICULTIES[difficulty];
+        let changes={happiness:(budget.welfare*0.35)+(budget.health*0.25)+(budget.education*0.15)-12-sys.traits.happinessDecay-(planet.mods.happinessDecay||0),wealth:(budget.infra*0.4)+(budget.education*0.25)-10+sys.traits.wealthBonus,stability:(budget.defence*0.35)+(budget.infra*0.1)-5-(planet.mods.stabilityDecay||0)};
+        Object.keys(changes).forEach(k=>{if(changes[k]<0)changes[k]*=d.severity;});
+        const newStats={happiness:Math.max(0,Math.min(100,stats.happiness+changes.happiness)),wealth:Math.max(0,Math.min(100,stats.wealth+changes.wealth)),stability:Math.max(0,Math.min(100,stats.stability+changes.stability))};
+        setStats(newStats);setHydrobite(Math.floor(80+newStats.wealth*0.3+d.hydroBonus*0.5));
+
+        const eventCount=eventsPerTurn+(planet.mods.extraEvents||0);
+        const events=getRandomEvents(eventCount);
+        setUsedEvents(prev=>[...prev,...events.map(e=>e.id)]);
+        setEventQueue(events);
+        if(events.length>0){setEvent(events[0]);setEventQueue(events.slice(1));setPhase('event');}
+        else{setTurn(t=>t+1);setPhase('playing');}
+      },[remaining,sys,stats,difficulty,budget,planet,eventsPerTurn,getRandomEvents,showToast]);
+
+      const handleChoice=useCallback((choice)=>{
+        const d=DIFFICULTIES[difficulty];let newStats={...stats};
+        Object.entries(choice.effects).forEach(([k,v])=>{if(newStats[k]!==undefined){const effectValue=v<0?v*d.severity:v;newStats[k]=Math.max(0,Math.min(100,newStats[k]+effectValue));}});
+        let newHydro=hydrobite-choice.cost+(choice.hydro||0);setHydrobite(Math.max(0,newHydro));setStats(newStats);
+
+        if(sys.traits.rebellionRisk&&newStats.happiness<sys.traits.rebellionRisk&&Math.random()<0.3){showToast(t('defeat.rebellion'),'error');setTimeout(()=>endGame(false,'rebellion'),1000);return;}
+        if(sys.traits.coupRisk&&newStats.stability<sys.traits.coupRisk&&Math.random()<0.3){showToast(t('defeat.coup'),'error');setTimeout(()=>endGame(false,'coup'),1000);return;}
+        if(newStats.stability<=0){endGame(false,'stability');return;}
+        if(newStats.happiness<=0){endGame(false,'happiness');return;}
+        if(turn>=maxTurns&&newStats.happiness>=targetHappiness&&newStats.wealth>=targetWealth&&newStats.stability>=targetStability){endGame(true,'survival');return;}
+        if(newStats.happiness>=95){endGame(true,'utopia');return;}
+        if(newStats.wealth>=95){endGame(true,'prosperity');return;}
+
+        if(eventQueue.length>0){setEvent(eventQueue[0]);setEventQueue(q=>q.slice(1));}
+        else{setTurn(t=>t+1);setEvent(null);setPhase('playing');}
+      },[difficulty,stats,hydrobite,sys,turn,maxTurns,eventQueue,targetHappiness,targetWealth,targetStability,endGame,showToast,t]);
+
+      const handleBudget=useCallback((sector,val)=>{setBudget(prev=>({...prev,[sector]:Math.max(0,Math.min(50,parseInt(val)||0))}));},[]);
+
+      // ===== RENDERS =====
+      if(!initialized||authLoading){return(<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner size="lg"/></div>);}
+
+      // LANG SELECT
+      if(phase==='lang'){
+        return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4"><StarBackground/><div className="text-center relative z-10 animate-fadeIn"><h1 className="text-4xl font-display font-bold gold-gradient mb-8">INDEPENDENCE</h1><p className="text-gray-400 mb-6">{T.ui.selectLanguage.ru}</p><div className="space-y-3">{[{id:'ru',flag:'🇷🇺',name:'Русский'},{id:'en',flag:'🇬🇧',name:'English'},{id:'de',flag:'🇩🇪',name:'Deutsch'}].map(l=>(<button key={l.id} onClick={()=>{setLang(l.id);setPhase('intro');}} className="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-4 bg-slate-800/50 border border-amber-500/30 rounded-xl hover:bg-slate-700/50 text-lg"><span className="text-2xl">{l.flag}</span><span>{l.name}</span></button>))}</div></div></div>);
+      }
+
+      // INTRO
+      if(phase==='intro'){
+        const steps=[{title:t('intro.title'),text:t('intro.p1')},{text:t('intro.p2')},{text:t('intro.p3')},{text:t('intro.mission'),isLast:true}];
+        const step=steps[introStep];
+        return(<div className="min-h-screen bg-slate-950 text-white p-6 flex items-center justify-center"><StarBackground/><div className="max-w-lg mx-auto text-center relative z-10 animate-fadeIn"><div className="bg-slate-800/50 border border-amber-500/30 rounded-2xl p-8">{step.title&&<h2 className="text-2xl font-display text-amber-400 mb-6">{step.title}</h2>}<p className="text-lg text-gray-300 leading-relaxed mb-8">{step.text}</p><div className="flex gap-4">{introStep>0&&<button onClick={()=>setIntroStep(s=>s-1)} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg">{t('ui.back')}</button>}<button onClick={()=>{if(step.isLast)setPhase('title');else setIntroStep(s=>s+1);}} className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg font-bold">{step.isLast?t('ui.startGame'):t('ui.next')}</button></div><div className="flex justify-center gap-2 mt-6">{steps.map((_,i)=>(<div key={i} className={`w-2 h-2 rounded-full ${i===introStep?'bg-amber-500':'bg-slate-600'}`}/>))}</div></div><button onClick={()=>setPhase('title')} className="mt-4 text-gray-500 hover:text-gray-400 text-sm">{t('ui.skip')}</button></div></div>);
+      }
+
+      // TITLE
+      if(phase==='title'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 relative"><StarBackground/><div className="max-w-md mx-auto pt-4 relative z-10">
+          <div className="flex justify-between items-center mb-4"><div className="flex gap-2"><button onClick={()=>setShowLeaderboard(true)} className="p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700">🏆</button>{!isPremium&&<button onClick={()=>setShowPremium(true)} className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg text-sm font-bold">⭐ Premium</button>}</div>{user?<button onClick={()=>setShowProfile(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-full hover:bg-slate-700"><div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center text-xs font-bold">{profile?.display_name?.[0]?.toUpperCase()||'👤'}</div><span className="text-sm text-amber-300">{profile?.display_name||'Profile'}</span>{profile?.is_premium&&<span className="text-amber-400">⭐</span>}</button>:<button onClick={()=>setShowAuth(true)} className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-full text-sm font-bold">{t('ui.login')}</button>}</div>
+
+          <div className="text-center mb-6"><h1 className="text-4xl sm:text-5xl font-display font-bold gold-gradient mb-2">{t('ui.title')}</h1><p className="text-amber-200/60 text-sm tracking-widest">{t('ui.subtitle')}</p></div>
+
+          <div className="mb-4"><label className="text-sm text-gray-400 block mb-2">🌍 {t('ui.choosePlanet')}</label><div className="grid grid-cols-5 gap-2">{Object.entries(PLANETS).map(([id,p])=>(<button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center transition ${planetId===id?'border-amber-500 bg-amber-500/20':'border-slate-600 hover:border-slate-500'}`}><span className="text-2xl block">{p.icon}</span><span className="text-xs text-gray-400">{'★'.repeat(p.difficulty)}</span></button>))}</div><p className="text-sm text-gray-400 mt-2 text-center">{T.planets[planetId].name[lang]} — {T.planets[planetId].traits[lang]}</p></div>
+
+          <div className="mb-4"><label className="text-sm text-gray-400 block mb-1">📊 {t('ui.difficulty')}</label><div className="grid grid-cols-3 gap-2">{Object.entries(DIFFICULTIES).map(([key,d])=>(<button key={key} onClick={()=>setDifficulty(key)} className={`py-3 rounded-lg border text-sm transition ${difficulty===key?'border-amber-500 bg-amber-500/20 text-amber-300':'border-slate-600 text-gray-400 hover:border-slate-500'}`}>{d.icon} {t(`ui.${key}`)}</button>))}</div></div>
+
+          <div className="mb-4"><label className="text-sm text-gray-400 block mb-1">⏱️ {t('ui.gameLength')}: {maxTurns} {t('ui.years')}</label><input type="range" min="10" max="30" step="5" value={maxTurns} onChange={e=>setMaxTurns(parseInt(e.target.value))} className="w-full" style={{background:`linear-gradient(90deg,#d97706 ${(maxTurns-10)/20*100}%,#1e293b ${(maxTurns-10)/20*100}%)`}}/></div>
+
+          <div className="mb-4"><label className="text-sm text-gray-400 block mb-1">🏛️ {t('ui.politicalSystem')}</label><div className="grid grid-cols-2 gap-2">{Object.entries(SYSTEMS).map(([id,s])=>(<button key={id} onClick={()=>setSystem(id)} className={`p-3 rounded-lg border text-left transition ${system===id?'border-amber-500 bg-amber-500/10':'border-slate-600 hover:border-slate-500'} ${s.premium&&!isPremium?'opacity-60':''}`}><div className="flex items-center gap-2"><span className="text-xl">{s.icon}</span><span className="text-sm font-bold text-amber-200">{T.systems[id].name[lang]}</span>{s.premium&&!isPremium&&<span className="text-xs bg-amber-500/20 text-amber-400 px-1 rounded">⭐</span>}</div></button>))}</div></div>
+
+          <button onClick={()=>setShowAdvanced(!showAdvanced)} className="w-full text-sm text-gray-400 hover:text-gray-300 mb-4">{showAdvanced?'▲':'▼'} {t('ui.advancedSettings')}</button>
+
+          {showAdvanced&&(<div className="bg-slate-800/50 rounded-lg p-4 mb-4 space-y-4">
+            <div><label className="text-sm text-gray-400">{t('ui.eventsPerTurn')}: {eventsPerTurn}</label><input type="range" min="1" max="4" value={eventsPerTurn} onChange={e=>setEventsPerTurn(parseInt(e.target.value))} className="w-full"/></div>
+            <div><label className="text-sm text-gray-400">{t('ui.target')} {t('ui.happiness')}: {targetHappiness}%</label><input type="range" min="50" max="90" step="5" value={targetHappiness} onChange={e=>setTargetHappiness(parseInt(e.target.value))} className="w-full"/></div>
+            <div><label className="text-sm text-gray-400">{t('ui.target')} {t('ui.wealth')}: {targetWealth}%</label><input type="range" min="50" max="90" step="5" value={targetWealth} onChange={e=>setTargetWealth(parseInt(e.target.value))} className="w-full"/></div>
+            <div><label className="text-sm text-gray-400">{t('ui.target')} {t('ui.stability')}: {targetStability}%</label><input type="range" min="50" max="90" step="5" value={targetStability} onChange={e=>setTargetStability(parseInt(e.target.value))} className="w-full"/></div>
+          </div>)}
+
+          <button onClick={startGame} className="w-full py-4 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-slate-900 rounded-xl font-display font-bold text-lg hover:from-amber-400 hover:to-yellow-400">{t('ui.startGame')}</button>
+        </div>
+        {showAuth&&<AuthModal onClose={()=>setShowAuth(false)}/>}
+        {showProfile&&<ProfileModal onClose={()=>setShowProfile(false)}/>}
+        {showLeaderboard&&<LeaderboardModal onClose={()=>setShowLeaderboard(false)}/>}
+        {showPremium&&<PremiumModal onClose={()=>setShowPremium(false)}/>}
+        {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+        </div>);
+      }
+
+      // PLAYING
+      if(phase==='playing'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/><div className="max-w-md mx-auto relative z-10">
+          <div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><span className="text-2xl">{sys.icon}</span><span className="text-amber-300 font-bold">{T.systems[system].leader[lang]}</span></div><div className="text-right"><span className="text-amber-400 font-display">{t('ui.year')} {turn}/{maxTurns}</span><p className="text-xs text-gray-500">{T.planets[planetId].name[lang]}</p></div></div>
+
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-amber-500/20 mb-4">
+            <StatBar label={t('ui.happiness')} value={stats.happiness} icon="😊" color="bg-gradient-to-r from-green-600 to-green-400"/>
+            <StatBar label={t('ui.wealth')} value={stats.wealth} icon="💰" color="bg-gradient-to-r from-yellow-600 to-yellow-400"/>
+            <StatBar label={t('ui.stability')} value={stats.stability} icon="⚖️" color="bg-gradient-to-r from-blue-600 to-blue-400"/>
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-700"><span className="text-amber-200/80">💎 {t('ui.budget')}</span><span className={`font-bold ${remaining<0?'text-red-400':'text-amber-300'}`}>{hydrobite} ({remaining>=0?'+':''}{remaining})</span></div>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-amber-500/20 mb-4">{SECTORS.map(sec=>(<div key={sec.id} className="mb-3"><div className="flex justify-between text-sm mb-1"><span className="text-amber-100/80">{sec.icon} {T.sectors[sec.id].name[lang]}</span><span className="text-amber-300 font-bold">{budget[sec.id]}</span></div><input type="range" min="0" max="50" value={budget[sec.id]} onChange={e=>handleBudget(sec.id,e.target.value)} className="w-full" style={{background:`linear-gradient(90deg,#d97706 ${budget[sec.id]*2}%,#1e293b ${budget[sec.id]*2}%)`}}/></div>))}</div>
+
+          <button onClick={processTurn} disabled={remaining<0} className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-xl font-bold text-lg disabled:opacity-50">{t('ui.submit')}</button>
+        </div>{toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}</div>);
+      }
+
+      // EVENT
+      if(phase==='event'&&event){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/><div className="max-w-md w-full relative z-10 animate-slideUp"><div className="bg-slate-800 rounded-2xl border border-amber-500/30 overflow-hidden"><div className="bg-gradient-to-r from-amber-900/50 to-slate-800 p-6 text-center"><span className="text-5xl block mb-2">{event.icon}</span><h2 className="text-xl font-display font-bold text-amber-400">{event.title[lang]}</h2></div><div className="p-6"><p className="text-gray-300 text-center mb-6">{event.desc[lang]}</p><div className="space-y-3">{event.choices.map((choice,i)=>(<button key={i} onClick={()=>handleChoice(choice)} className="w-full p-4 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600 hover:border-amber-500/50 rounded-xl text-left transition"><div className="flex justify-between items-start mb-1"><span className="font-bold text-amber-200">{choice.text[lang]}</span><span className="text-amber-400 text-sm">-{choice.cost}💎</span></div><div className="flex gap-2 mt-2 text-xs">{Object.entries(choice.effects).map(([k,v])=>(<span key={k} className={v>=0?'text-green-400':'text-red-400'}>{k==='happiness'?'😊':k==='wealth'?'💰':'⚖️'}{v>=0?'+':''}{v}</span>))}</div></button>))}</div></div></div></div></div>);
+      }
+
+      // VICTORY
+      if(phase==='victory'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/><div className="max-w-md w-full text-center relative z-10 animate-slideUp"><div className="bg-gradient-to-b from-amber-900/50 to-slate-800 rounded-2xl border border-amber-500/50 p-8"><span className="text-6xl block mb-4">🏆</span><h1 className="text-3xl font-display font-bold gold-gradient mb-4">{t('ui.victory')}</h1><p className="text-amber-200 mb-6">{T.victoryMsg[victoryType||'survival']?.[lang]}</p><div className="bg-slate-800/50 rounded-xl p-4 mb-6"><div className="text-4xl font-bold text-amber-400 mb-2">{finalScore}</div><p className="text-gray-400">{t('ui.score')}</p></div><div className="grid grid-cols-3 gap-4 mb-6"><div className="text-center"><span className="text-2xl">😊</span><p className="text-lg font-bold text-green-400">{Math.round(stats.happiness)}%</p></div><div className="text-center"><span className="text-2xl">💰</span><p className="text-lg font-bold text-yellow-400">{Math.round(stats.wealth)}%</p></div><div className="text-center"><span className="text-2xl">⚖️</span><p className="text-lg font-bold text-blue-400">{Math.round(stats.stability)}%</p></div></div><button onClick={()=>{setPhase('title');setIntroStep(0);}} className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-xl font-bold">{t('ui.playAgain')}</button></div></div></div>);
+      }
+
+      // GAMEOVER
+      if(phase==='gameover'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/><div className="max-w-md w-full text-center relative z-10 animate-slideUp"><div className="bg-gradient-to-b from-red-900/50 to-slate-800 rounded-2xl border border-red-500/50 p-8"><span className="text-6xl block mb-4">💀</span><h1 className="text-3xl font-display font-bold text-red-400 mb-4">{t('ui.defeat')}</h1><p className="text-red-200 mb-6">{T.defeat[victoryType||'stability']?.[lang]}</p><div className="bg-slate-800/50 rounded-xl p-4 mb-6"><p className="text-gray-400">{t('ui.year')} {turn} / {maxTurns}</p><p className="text-2xl font-bold text-red-400">{finalScore} {t('ui.score')}</p></div><button onClick={()=>{setPhase('title');setIntroStep(0);}} className="w-full py-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-bold">{t('ui.playAgain')}</button></div></div></div>);
+      }
+      return null;
     }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+    function App(){return(<AuthProvider><LangProvider><Game/></LangProvider></AuthProvider>);}
+    ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   </script>
-
-  <!-- Удаляем Service Worker и кэши -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(registrations => {
-        registrations.forEach(r => r.unregister());
-      });
-      caches.keys().then(keys => {
-        keys.forEach(key => caches.delete(key));
-      });
-    }
-  </script>
+  <script>if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(r=>r.unregister()));caches.keys().then(k=>k.forEach(k=>caches.delete(k)));}</script>
 </body>
 </html>
