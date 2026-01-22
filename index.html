@@ -206,17 +206,27 @@
       const[initialized,setInitialized]=useState(false);
 
       const loadProfile=useCallback(async(userId)=>{
-        try{const{data}=await supabase.from('profiles').select('*').eq('id',userId).single();if(data)setProfile(data);}catch(e){}
+        try{const{data}=await supabase.from('profiles').select('*').eq('id',userId).single();if(data)setProfile(data);}catch(e){console.warn('Profile load error:',e);}
       },[]);
 
       useEffect(()=>{
+        let mounted=true;
+        const timeout=setTimeout(()=>{if(mounted&&!initialized){console.warn('Auth timeout, proceeding without auth');setLoading(false);setInitialized(true);}},3000);
+        
         supabase.auth.getSession().then(({data:{session}})=>{
+          if(!mounted)return;
           const u=session?.user??null;setUser(u);if(u)loadProfile(u.id);setLoading(false);setInitialized(true);
+        }).catch(e=>{
+          console.warn('Auth error:',e);
+          if(mounted){setLoading(false);setInitialized(true);}
         });
+        
         const{data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+          if(!mounted)return;
           const u=session?.user??null;setUser(u);if(u)await loadProfile(u.id);else setProfile(null);setLoading(false);
         });
-        return()=>subscription.unsubscribe();
+        
+        return()=>{mounted=false;clearTimeout(timeout);subscription.unsubscribe();};
       },[loadProfile]);
 
       const signUp=async(email,password,username)=>{const{data,error}=await supabase.auth.signUp({email,password,options:{data:{username,full_name:username}}});if(error)throw error;return data;};
@@ -400,7 +410,7 @@
 
       // LANG SELECT
       if(phase==='lang'){
-        return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4"><StarBackground/><div className="text-center relative z-10 animate-fadeIn"><h1 className="text-4xl font-display font-bold gold-gradient mb-8">INDEPENDENCE</h1><p className="text-gray-400 mb-6">{T.ui.selectLanguage.ru}</p><div className="space-y-3">{[{id:'ru',flag:'🇷🇺',name:'Русский'},{id:'en',flag:'🇬🇧',name:'English'},{id:'de',flag:'🇩🇪',name:'Deutsch'}].map(l=>(<button key={l.id} onClick={()=>{setLang(l.id);setPhase('intro');}} className="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-4 bg-slate-800/50 border border-amber-500/30 rounded-xl hover:bg-slate-700/50 text-lg"><span className="text-2xl">{l.flag}</span><span>{l.name}</span></button>))}</div></div></div>);
+        return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4"><StarBackground/><div className="text-center relative z-10 animate-fadeIn"><h1 className="text-4xl font-display font-bold gold-gradient mb-8">INDEPENDENCE</h1><p className="text-gray-400 mb-6">{T.ui.selectLanguage.ru}</p><div className="space-y-3">{[{id:'ru',flag:'🇷🇺',name:'Русский'},{id:'en',flag:'🇬🇧',name:'English'},{id:'de',flag:'🇩🇪',name:'Deutsch'}].map(l=>(<button key={l.id} onClick={()=>{setLang(l.id);setPhase('intro');}} className="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-4 bg-slate-800/50 border border-amber-500/30 rounded-xl hover:bg-slate-700/50 text-lg"><span className="text-2xl">{l.flag}</span><span>{l.name}</span></button>))}</div><button onClick={()=>{localStorage.clear();sessionStorage.clear();location.reload();}} className="mt-8 text-gray-600 hover:text-gray-400 text-xs">🔄 Reset</button></div></div>);
       }
 
       // INTRO
@@ -482,6 +492,13 @@
     function App(){return(<AuthProvider><LangProvider><Game/></LangProvider></AuthProvider>);}
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   </script>
-  <script>if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(r=>r.unregister()));caches.keys().then(k=>k.forEach(k=>caches.delete(k)));}</script>
+  <script>
+    // Cleanup on load
+    if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(r=>r.forEach(r=>r.unregister()));caches.keys().then(k=>k.forEach(k=>caches.delete(k)));}
+    // Reset function for debugging
+    window.resetGame=()=>{localStorage.clear();sessionStorage.clear();location.reload();};
+    // Auto-reset if stuck (check via URL param)
+    if(location.search.includes('reset')){localStorage.clear();sessionStorage.clear();history.replaceState({},'',location.pathname);location.reload();}
+  </script>
 </body>
 </html>
