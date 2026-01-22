@@ -126,6 +126,7 @@
         stability:{ru:'Хаос поглотил вашу цивилизацию. Никто уже не помнит, кто за что отвечает. Включая вас.',en:'Chaos has consumed your civilization. Nobody remembers who\'s responsible for what. Including you.',de:'Chaos hat Ihre Zivilisation verschlungen.'},
         rebellion:{ru:'Мятеж сверг монархию! Корона теперь украшает музей, а вы — мемуары в изгнании.',en:'A rebellion overthrew the monarchy! The crown now decorates a museum, and you — memoirs in exile.',de:'Ein Aufstand hat die Monarchie gestürzt!'},
         coup:{ru:'Военный переворот! Генералы решили, что они справятся лучше. История покажет.',en:'Military coup! The generals decided they could do better. History will tell.',de:'Militärputsch! Die Generäle meinten, sie könnten es besser.'},
+        targets:{ru:'Цели не достигнуты! Вы не смогли выполнить поставленные задачи в отведённое время.',en:'Targets not met! You failed to achieve the set goals within the allotted time.',de:'Ziele nicht erreicht! Sie haben die gesetzten Ziele nicht in der vorgegebenen Zeit erreicht.'},
       },
       victoryMsg:{
         utopia:{ru:'Утопия достигнута! Философы будущего будут изучать ваш опыт. Или искать подвох.',en:'Utopia achieved! Future philosophers will study your experience. Or look for the catch.',de:'Utopie erreicht! Zukünftige Philosophen werden Ihre Erfahrung studieren.'},
@@ -375,14 +376,19 @@
         if(sys.traits.rebellionRisk&&newStats.happiness<sys.traits.rebellionRisk&&Math.random()<0.3){showToast(t('defeat.rebellion'),'error');setTimeout(()=>endGame(false,'rebellion'),1000);return true;}
         if(sys.traits.coupRisk&&newStats.stability<sys.traits.coupRisk&&Math.random()<0.3){showToast(t('defeat.coup'),'error');setTimeout(()=>endGame(false,'coup'),1000);return true;}
         // Early victory conditions
-        if(newStats.happiness>=95){endGame(true,'utopia');return true;}
-        if(newStats.wealth>=95){endGame(true,'prosperity');return true;}
-        // End of game check
+        if(newStats.happiness>=95&&newStats.wealth>=70&&newStats.stability>=70){endGame(true,'utopia');return true;}
+        if(newStats.wealth>=95&&newStats.happiness>=70&&newStats.stability>=70){endGame(true,'prosperity');return true;}
+        // End of game - check custom targets
         if(newTurn>maxTurns){
-          if(newStats.happiness>=targetHappiness&&newStats.wealth>=targetWealth&&newStats.stability>=targetStability){
+          const failed=[];
+          if(newStats.happiness<targetHappiness)failed.push(`😊${Math.round(newStats.happiness)}%<${targetHappiness}%`);
+          if(newStats.wealth<targetWealth)failed.push(`💰${Math.round(newStats.wealth)}%<${targetWealth}%`);
+          if(newStats.stability<targetStability)failed.push(`⚖️${Math.round(newStats.stability)}%<${targetStability}%`);
+          if(failed.length===0){
             endGame(true,'survival');
           }else{
-            endGame(false,'stability');
+            showToast(`❌ ${failed.join(', ')}`,'error');
+            setTimeout(()=>endGame(false,'targets'),500);
           }
           return true;
         }
@@ -476,13 +482,14 @@
 
       // PLAYING
       if(phase==='playing'){
+        const getStatColor=(value,target)=>value>=target?'text-green-400':value>=target-10?'text-amber-300':'text-red-400';
         return(<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/><div className="max-w-md mx-auto relative z-10">
           <div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><span className="text-2xl">{sys.icon}</span><span className="text-amber-300 font-bold">{T.systems[system].leader[lang]}</span></div><div className="text-right"><span className="text-amber-400 font-display">{t('ui.year')} {turn}/{maxTurns}</span><p className="text-xs text-gray-500">{T.planets[planetId].name[lang]}</p></div></div>
 
           <div className="bg-slate-800/50 rounded-xl p-4 border border-amber-500/20 mb-4">
-            <StatBar label={t('ui.happiness')} value={stats.happiness} icon="😊" color="bg-gradient-to-r from-green-600 to-green-400"/>
-            <StatBar label={t('ui.wealth')} value={stats.wealth} icon="💰" color="bg-gradient-to-r from-yellow-600 to-yellow-400"/>
-            <StatBar label={t('ui.stability')} value={stats.stability} icon="⚖️" color="bg-gradient-to-r from-blue-600 to-blue-400"/>
+            <div className="mb-2"><div className="flex justify-between text-xs mb-1"><span className="text-amber-100/80">😊 {t('ui.happiness')}</span><span className={`font-bold ${getStatColor(stats.happiness,targetHappiness)}`}>{Math.round(stats.happiness)}% <span className="text-gray-500">/ {targetHappiness}%</span></span></div><div className="h-2 bg-slate-900 rounded overflow-hidden border border-amber-900/30 relative"><div className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-500" style={{width:`${Math.min(100,Math.max(0,stats.happiness))}%`}}/><div className="absolute top-0 bottom-0 w-0.5 bg-white/50" style={{left:`${targetHappiness}%`}}/></div></div>
+            <div className="mb-2"><div className="flex justify-between text-xs mb-1"><span className="text-amber-100/80">💰 {t('ui.wealth')}</span><span className={`font-bold ${getStatColor(stats.wealth,targetWealth)}`}>{Math.round(stats.wealth)}% <span className="text-gray-500">/ {targetWealth}%</span></span></div><div className="h-2 bg-slate-900 rounded overflow-hidden border border-amber-900/30 relative"><div className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 transition-all duration-500" style={{width:`${Math.min(100,Math.max(0,stats.wealth))}%`}}/><div className="absolute top-0 bottom-0 w-0.5 bg-white/50" style={{left:`${targetWealth}%`}}/></div></div>
+            <div className="mb-2"><div className="flex justify-between text-xs mb-1"><span className="text-amber-100/80">⚖️ {t('ui.stability')}</span><span className={`font-bold ${getStatColor(stats.stability,targetStability)}`}>{Math.round(stats.stability)}% <span className="text-gray-500">/ {targetStability}%</span></span></div><div className="h-2 bg-slate-900 rounded overflow-hidden border border-amber-900/30 relative"><div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-500" style={{width:`${Math.min(100,Math.max(0,stats.stability))}%`}}/><div className="absolute top-0 bottom-0 w-0.5 bg-white/50" style={{left:`${targetStability}%`}}/></div></div>
             <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-700"><span className="text-amber-200/80">💎 {t('ui.budget')}</span><span className={`font-bold ${remaining<0?'text-red-400':'text-amber-300'}`}>{hydrobite} ({remaining>=0?'+':''}{remaining})</span></div>
           </div>
 
