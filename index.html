@@ -49,144 +49,182 @@
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
     const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
     const STRIPE_KEY='pk_live_51SrFQOH02sKb65Xcey2pn7bvJhJQ1EqpjYyAoiVKK3OmGZjlKCMRmuX4t6zUitqQ2RHI7MIceHAkHYadAi4r31D900L7ki97pX';
+    const CONTENT_CACHE_KEY='independence_content_v2';
+    const CONTENT_CACHE_TTL=1000*60*30; // 30 min
 
-    // ===== LOCALIZATION =====
-    const T={
-      ui:{
-        title:{ru:'INDEPENDENCE',en:'INDEPENDENCE',de:'INDEPENDENCE'},
-        subtitle:{ru:'ОБРАЗОВАТЕЛЬНАЯ ИГРА О ПОЛИТИКЕ',en:'CIVIC EDUCATION GAME',de:'POLITISCHES BILDUNGSSPIEL'},
-        login:{ru:'Войти',en:'Login',de:'Anmelden'},
-        register:{ru:'Регистрация',en:'Register',de:'Registrieren'},
-        premium:{ru:'Premium',en:'Premium',de:'Premium'},
-        premiumPrice:{ru:'£2.99/мес',en:'£2.99/mo',de:'£2.99/Mo'},
-        startGame:{ru:'Начать игру',en:'Start Game',de:'Spiel starten'},
-        year:{ru:'Год',en:'Year',de:'Jahr'},
-        submit:{ru:'Утвердить бюджет',en:'Submit Budget',de:'Budget bestätigen'},
-        happiness:{ru:'Счастье',en:'Happiness',de:'Zufriedenheit'},
-        wealth:{ru:'Богатство',en:'Wealth',de:'Wohlstand'},
-        stability:{ru:'Стабильность',en:'Stability',de:'Stabilität'},
-        budget:{ru:'Бюджет',en:'Budget',de:'Budget'},
-        remaining:{ru:'Остаток',en:'Remaining',de:'Verbleibend'},
-        victory:{ru:'ПОБЕДА!',en:'VICTORY!',de:'SIEG!'},
-        defeat:{ru:'ПОРАЖЕНИЕ',en:'DEFEAT',de:'NIEDERLAGE'},
-        playAgain:{ru:'Играть снова',en:'Play Again',de:'Nochmal spielen'},
-        back:{ru:'Назад',en:'Back',de:'Zurück'},
-        next:{ru:'Далее',en:'Next',de:'Weiter'},
-        skip:{ru:'Пропустить',en:'Skip',de:'Überspringen'},
-        close:{ru:'Закрыть',en:'Close',de:'Schließen'},
-        easy:{ru:'Легко',en:'Easy',de:'Leicht'},
-        normal:{ru:'Нормально',en:'Normal',de:'Normal'},
-        hard:{ru:'Сложно',en:'Hard',de:'Schwer'},
-        years:{ru:'лет',en:'years',de:'Jahre'},
-        choosePlanet:{ru:'Выберите планету',en:'Choose Planet',de:'Planet wählen'},
-        score:{ru:'Очки',en:'Score',de:'Punkte'},
-        signOut:{ru:'Выйти',en:'Sign Out',de:'Abmelden'},
-        email:{ru:'Email',en:'Email',de:'E-Mail'},
-        password:{ru:'Пароль',en:'Password',de:'Passwort'},
-        username:{ru:'Имя',en:'Username',de:'Name'},
-        loading:{ru:'Загрузка...',en:'Loading...',de:'Lädt...'},
-        selectLanguage:{ru:'Выберите язык',en:'Select Language',de:'Sprache wählen'},
-        advancedSettings:{ru:'Расширенные настройки',en:'Advanced Settings',de:'Erweiterte Einstellungen'},
-        target:{ru:'Цель',en:'Target',de:'Ziel'},
-        gameLength:{ru:'Длина игры',en:'Game length',de:'Spiellänge'},
-        eventsPerTurn:{ru:'Событий за ход',en:'Events per turn',de:'Ereignisse pro Zug'},
-        difficulty:{ru:'Сложность',en:'Difficulty',de:'Schwierigkeit'},
-        politicalSystem:{ru:'Политическая система',en:'Political System',de:'Politisches System'},
-      },
-      intro:{
-        title:{ru:'Поздравляем, уважаемый Основатель!',en:'Congratulations, esteemed Founder!',de:'Herzlichen Glückwunsch, geschätzter Gründer!'},
-        p1:{ru:'Пока остальное человечество погрязло в бюрократических спорах о том, кому принадлежит последняя банка консервированного кислорода, вы проявили инициативу.',en:'While the rest of humanity was busy arguing over who owns the last can of preserved oxygen, you took initiative.',de:'Während der Rest der Menschheit sich darüber stritt, wem die letzte Dose Sauerstoffkonserven gehört, haben Sie Initiative ergriffen.'},
-        p2:{ru:'Ваш корабль с тысячей колонистов приземлился на планете, которую никто не успел застолбить. Теперь у вас есть уникальная возможность — построить идеальное общество с нуля.',en:'Your ship carrying a thousand colonists has landed on a planet nobody bothered to claim. Now you have a unique opportunity — to build a perfect society from scratch.',de:'Ihr Schiff mit tausend Kolonisten ist auf einem Planeten gelandet, den niemand beansprucht hat. Jetzt haben Sie eine einzigartige Gelegenheit — eine perfekte Gesellschaft von Grund auf aufzubauen.'},
-        p3:{ru:'Или, как показывает история, очередное неидеальное. Но кто мы такие, чтобы судить?',en:'Or, as history suggests, yet another imperfect one. But who are we to judge?',de:'Oder, wie die Geschichte zeigt, eine weitere unvollkommene. Aber wer sind wir, um zu urteilen?'},
-        mission:{ru:'Ваша задача: создать процветающую цивилизацию, избежав при этом революций, голодных бунтов и неловких ситуаций с соседними колониями.',en:'Your mission: create a thriving civilization while avoiding revolutions, food riots, and awkward situations with neighboring colonies.',de:'Ihre Mission: eine blühende Zivilisation aufbauen und dabei Revolutionen, Hungeraufstände und peinliche Situationen mit Nachbarkolonien vermeiden.'},
-      },
-      systems:{
-        parliamentary:{name:{ru:'Парламентская демократия',en:'Parliamentary Democracy',de:'Parlamentarische Demokratie'},leader:{ru:'Премьер-министр',en:'Prime Minister',de:'Premierminister'},desc:{ru:'Вы решили, что лучший способ управлять — это позволить людям спорить до хрипоты, а потом голосовать. На практике в дискуссии обычно рождается головная боль, но это детали.',en:'You\'ve decided the best way to govern is to let people argue until hoarse, then vote. In practice, discussions produce headaches, but that\'s a minor detail.',de:'Sie haben entschieden, dass der beste Weg zu regieren darin besteht, die Menschen diskutieren zu lassen und dann abzustimmen.'},pros:{ru:'Высокая стабильность, довольные граждане',en:'High stability, satisfied citizens',de:'Hohe Stabilität, zufriedene Bürger'},cons:{ru:'Медленные решения, коалиции разваливаются',en:'Slow decisions, coalitions collapse',de:'Langsame Entscheidungen, Koalitionen zerfallen'}},
-        presidential:{name:{ru:'Президентская республика',en:'Presidential Republic',de:'Präsidialrepublik'},leader:{ru:'Президент',en:'President',de:'Präsident'},desc:{ru:'Один человек, много ответственности, и никого, на кого можно свалить вину. Прямой мандат народа и полная свобода действий — в рамках конституции, которую вы же и написали.',en:'One person, lots of responsibility, and nobody to blame. Direct mandate and complete freedom — within the constitution you wrote yourself.',de:'Eine Person, viel Verantwortung, und niemand zum Beschuldigen. Direktes Mandat und volle Handlungsfreiheit.'},pros:{ru:'Быстрые решения, бонус к богатству',en:'Fast decisions, wealth bonus',de:'Schnelle Entscheidungen, Wohlstandsbonus'},cons:{ru:'Всё зависит от вас, оппозиция не дремлет',en:'Everything depends on you, opposition never sleeps',de:'Alles hängt von Ihnen ab'}},
-        monarchy:{name:{ru:'Конституционная монархия',en:'Constitutional Monarchy',de:'Konstitutionelle Monarchie'},leader:{ru:'Монарх',en:'Monarch',de:'Monarch'},desc:{ru:'Зачем выбирать лидера каждые несколько лет, если можно просто родиться им? Монархия — это традиции, стабильность и красивые церемонии. А ещё семейные драмы.',en:'Why elect a leader every few years when you can simply be born one? Monarchy means traditions, stability, and beautiful ceremonies. Also family dramas.',de:'Warum alle paar Jahre einen Führer wählen, wenn man einfach als einer geboren werden kann? Traditionen, Stabilität und schöne Zeremonien.'},pros:{ru:'Преемственность власти, +10 стабильность',en:'Continuity of power, +10 stability',de:'Machtkontinuität, +10 Stabilität'},cons:{ru:'Скандалы в семье, риск восстания',en:'Family scandals, rebellion risk',de:'Familienskandale, Aufstandsrisiko'}},
-        dictatorship:{name:{ru:'Диктатура',en:'Dictatorship',de:'Diktatur'},leader:{ru:'Верховный лидер',en:'Supreme Leader',de:'Oberster Führer'},desc:{ru:'Эффективность превыше всего! Демократия — это долго и скучно, а вы — человек дела. Воплощайте своё видение без утомительных голосований и компромиссов.',en:'Efficiency above all! Democracy is slow and boring, and you\'re a person of action. Implement your vision without tedious voting and compromises.',de:'Effizienz über alles! Demokratie ist langsam und langweilig, und Sie sind ein Mensch der Tat.'},pros:{ru:'Максимальная эффективность, +5 стабильность',en:'Maximum efficiency, +5 stability',de:'Maximale Effizienz, +5 Stabilität'},cons:{ru:'Счастье падает каждый ход, риск переворота',en:'Happiness drops each turn, coup risk',de:'Zufriedenheit sinkt, Putschrisiko'}},
-        technocracy:{name:{ru:'Технократия',en:'Technocracy',de:'Technokratie'},leader:{ru:'Главный технолог',en:'Chief Technologist',de:'Cheftechnologe'},desc:{ru:'Политики — это вчерашний день. Будущее принадлежит экспертам! Решения принимают те, кто действительно разбирается в вопросе. Минус — эксперты иногда забывают, что люди это не просто данные.',en:'Politicians are yesterday\'s news. The future belongs to experts! Decisions are made by those who actually understand. Downside — experts sometimes forget people aren\'t just data.',de:'Politiker sind von gestern. Die Zukunft gehört den Experten!'},pros:{ru:'Оптимальные решения, +15 богатство',en:'Optimal decisions, +15 wealth',de:'Optimale Entscheidungen, +15 Wohlstand'},cons:{ru:'Народ чувствует себя подопытными, -10 старт',en:'People feel like test subjects, -10 start',de:'Menschen fühlen sich wie Versuchskaninchen'}},
-        direct:{name:{ru:'Прямая демократия',en:'Direct Democracy',de:'Direkte Demokratie'},leader:{ru:'Координатор',en:'Coordinator',de:'Koordinator'},desc:{ru:'Каждый голос важен! Буквально каждый. По каждому вопросу. Прямая демократия — это когда народ решает всё сам. Звучит идеально, пока вы не попробуете провести референдум о цвете урн.',en:'Every voice matters! Literally every one. On every issue. Direct democracy is when people decide everything themselves. Sounds ideal until you try to hold a referendum on trash bin colors.',de:'Jede Stimme zählt! Buchstäblich jede. Bei jedem Thema.'},pros:{ru:'Максимальная легитимность, счастье растёт',en:'Maximum legitimacy, happiness grows',de:'Maximale Legitimität, Zufriedenheit wächst'},cons:{ru:'Очень медленно, -5 стабильность, усталость',en:'Very slow, -5 stability, fatigue',de:'Sehr langsam, -5 Stabilität'}},
-      },
-      planets:{
-        terranova:{name:{ru:'Терра Нова',en:'Terra Nova',de:'Terra Nova'},desc:{ru:'Планета-близнец Земли. Умеренный климат, достаточно ресурсов, никаких сюрпризов. Скучная? Возможно. Пригодная для жизни? Определённо.',en:'Earth\'s twin planet. Moderate climate, enough resources, no surprises. Boring? Perhaps. Habitable? Definitely.',de:'Erdähnlicher Planet. Gemäßigtes Klima, genug Ressourcen, keine Überraschungen.'},traits:{ru:'Сбалансированная',en:'Balanced',de:'Ausgewogen'},quote:{ru:'«Для тех, кто ценит предсказуемость»',en:'"For those who value predictability"',de:'„Für die, die Vorhersehbarkeit schätzen"'}},
-        aridia:{name:{ru:'Аридия',en:'Aridia',de:'Aridia'},desc:{ru:'Пустынный мир. Вода здесь дороже золота. Зато минералов — завались, и конкуренты не рвутся. Выживание сложное, но возможное.',en:'Desert world. Water costs more than gold. But minerals are abundant, and competitors aren\'t rushing here. Survival is tough but possible.',de:'Wüstenwelt. Wasser teurer als Gold. Aber Mineralien reichlich vorhanden.'},traits:{ru:'Пустыня • Минералы',en:'Desert • Minerals',de:'Wüste • Mineralien'},quote:{ru:'«Здесь закаляются характеры и испаряется оптимизм»',en:'"Where characters are forged and optimism evaporates"',de:'„Hier werden Charaktere geschmiedet"'}},
-        edemia:{name:{ru:'Эдемия',en:'Edemia',de:'Edemia'},desc:{ru:'Рай на земле! Плодородные земли, приятный климат, богатые ресурсы. Единственная проблема — все остальные тоже хотят кусочек этого рая.',en:'Paradise on earth! Fertile lands, pleasant climate, rich resources. Only problem — everyone else wants a piece of this paradise too.',de:'Paradies auf Erden! Fruchtbares Land, angenehmes Klima. Einziges Problem — alle anderen wollen auch ein Stück.'},traits:{ru:'Богатая • Соседи',en:'Rich • Neighbors',de:'Reich • Nachbarn'},quote:{ru:'«В раю всегда найдётся змей»',en:'"There\'s always a serpent in paradise"',de:'„Im Paradies gibt es immer eine Schlange"'}},
-        chaosprime:{name:{ru:'Хаос Прайм',en:'Chaos Prime',de:'Chaos Prime'},desc:{ru:'Геологически активный мир с непредсказуемым характером. Землетрясения по вторникам, извержения по пятницам, а в выходные — сюрприз!',en:'Geologically active world with unpredictable character. Earthquakes on Tuesdays, eruptions on Fridays, weekends — surprise!',de:'Geologisch aktive Welt. Erdbeben dienstags, Ausbrüche freitags, am Wochenende — Überraschung!'},traits:{ru:'Хаос • События',en:'Chaos • Events',de:'Chaos • Ereignisse'},quote:{ru:'«Стабильность — это скучно»',en:'"Stability is boring"',de:'„Stabilität ist langweilig"'}},
-        polaris:{name:{ru:'Полярис',en:'Polaris',de:'Polaris'},desc:{ru:'Холодный мир на краю обитаемой зоны. Вечная мерзлота закаляет характер. Или убивает. Третьего не дано. Зато высокая сплочённость — некуда бежать.',en:'Cold world on the edge of habitable zone. Permafrost builds character. Or kills you. No third option. But high unity — nowhere to run.',de:'Kalte Welt am Rand der bewohnbaren Zone. Permafrost stärkt den Charakter. Oder tötet.'},traits:{ru:'Холод • Единство',en:'Cold • Unity',de:'Kalt • Einheit'},quote:{ru:'«То, что нас не убивает...»',en:'"What doesn\'t kill us..."',de:'„Was uns nicht tötet..."'}},
-      },
-      sectors:{
-        defence:{name:{ru:'Оборона',en:'Defence',de:'Verteidigung'}},
-        education:{name:{ru:'Образование',en:'Education',de:'Bildung'}},
-        health:{name:{ru:'Здравоохранение',en:'Healthcare',de:'Gesundheit'}},
-        infra:{name:{ru:'Инфраструктура',en:'Infrastructure',de:'Infrastruktur'}},
-        welfare:{name:{ru:'Соцзащита',en:'Welfare',de:'Soziales'}},
-      },
-      defeat:{
-        happiness:{ru:'Народ восстал! Ваше правление окончено. На площадях скандируют не самые лестные слоганы о вашем руководстве.',en:'The people have risen! Your rule is over. The squares echo with unflattering slogans about your leadership.',de:'Das Volk hat sich erhoben! Ihre Herrschaft ist vorbei.'},
-        stability:{ru:'Хаос поглотил вашу цивилизацию. Никто уже не помнит, кто за что отвечает. Включая вас.',en:'Chaos has consumed your civilization. Nobody remembers who\'s responsible for what. Including you.',de:'Chaos hat Ihre Zivilisation verschlungen.'},
-        rebellion:{ru:'Мятеж сверг монархию! Корона теперь украшает музей, а вы — мемуары в изгнании.',en:'A rebellion overthrew the monarchy! The crown now decorates a museum, and you — memoirs in exile.',de:'Ein Aufstand hat die Monarchie gestürzt!'},
-        coup:{ru:'Военный переворот! Генералы решили, что они справятся лучше. История покажет.',en:'Military coup! The generals decided they could do better. History will tell.',de:'Militärputsch! Die Generäle meinten, sie könnten es besser.'},
-        targets:{ru:'Цели не достигнуты! Вы не смогли выполнить поставленные задачи в отведённое время.',en:'Targets not met! You failed to achieve the set goals within the allotted time.',de:'Ziele nicht erreicht! Sie haben die gesetzten Ziele nicht in der vorgegebenen Zeit erreicht.'},
-      },
-      victoryMsg:{
-        utopia:{ru:'Утопия достигнута! Философы будущего будут изучать ваш опыт. Или искать подвох.',en:'Utopia achieved! Future philosophers will study your experience. Or look for the catch.',de:'Utopie erreicht! Zukünftige Philosophen werden Ihre Erfahrung studieren.'},
-        prosperity:{ru:'Экономическое чудо! Ваша колония — образец процветания. Соседи завидуют.',en:'Economic miracle! Your colony is a model of prosperity. Neighbors are envious.',de:'Wirtschaftswunder! Ihre Kolonie ist ein Vorbild des Wohlstands.'},
-        survival:{ru:'Вы провели цивилизацию через все испытания! Не идеально, но вы выжили. А это уже достижение.',en:'You guided your civilization through all challenges! Not perfect, but you survived. That\'s an achievement.',de:'Sie haben alle Herausforderungen gemeistert! Nicht perfekt, aber Sie haben überlebt.'},
-      },
+    // ===== CONTENT LOADER =====
+    const loadContentFromDB=async()=>{
+      try{
+        const[langs,texts,systems,planets,events,sectors,diffs]=await Promise.all([
+          supabase.from('languages').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('ui_texts').select('*'),
+          supabase.from('political_systems').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('planets').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('events').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('budget_sectors').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('difficulties').select('*').eq('is_active',true).order('sort_order'),
+        ]);
+        
+        if(langs.error||texts.error||systems.error||planets.error||events.error)throw new Error('DB query failed');
+        
+        const data={
+          languages:langs.data||[],
+          ui_texts:texts.data||[],
+          systems:systems.data||[],
+          planets:planets.data||[],
+          events:events.data||[],
+          sectors:sectors.data||[],
+          difficulties:diffs.data||[]
+        };
+        
+        localStorage.setItem(CONTENT_CACHE_KEY,JSON.stringify({data,timestamp:Date.now()}));
+        console.log('✅ Content loaded from DB');
+        return data;
+      }catch(e){
+        console.error('❌ DB load failed:',e);
+        return null;
+      }
     };
 
-    // ===== GAME DATA =====
-    const DIFFICULTIES={easy:{icon:'😊',bonus:10,hydroBonus:30,severity:0.7},normal:{icon:'😐',bonus:0,hydroBonus:0,severity:1.0},hard:{icon:'😰',bonus:-10,hydroBonus:-20,severity:1.3}};
-    const SYSTEMS={parliamentary:{id:'parliamentary',icon:'🏛️',premium:false,traits:{needsApproval:true,threshold:40,stabilityBonus:0,happinessDecay:0,wealthBonus:0}},presidential:{id:'presidential',icon:'🦅',premium:false,traits:{needsApproval:false,stabilityBonus:0,happinessDecay:0,wealthBonus:5}},monarchy:{id:'monarchy',icon:'👑',premium:true,traits:{needsApproval:false,stabilityBonus:10,happinessDecay:0,wealthBonus:0,rebellionRisk:25}},dictatorship:{id:'dictatorship',icon:'⚔️',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:5,wealthBonus:0,coupRisk:30}},technocracy:{id:'technocracy',icon:'🔬',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:2,wealthBonus:15,startPenalty:10}},direct:{id:'direct',icon:'🗳️',premium:true,traits:{needsApproval:false,stabilityBonus:-5,happinessDecay:-3,wealthBonus:0,referendumChance:0.25}}};
-    const PLANETS={terranova:{id:'terranova',icon:'🌍',difficulty:2,stats:{happiness:60,wealth:50,stability:70},mods:{eventMult:1.0,extraEvents:0}},aridia:{id:'aridia',icon:'🏜️',difficulty:4,stats:{happiness:45,wealth:35,stability:60},mods:{eventMult:1.2,extraEvents:0,happinessDecay:2}},edemia:{id:'edemia',icon:'🌴',difficulty:2,stats:{happiness:75,wealth:70,stability:55},mods:{eventMult:1.0,extraEvents:0,stabilityDecay:2}},chaosprime:{id:'chaosprime',icon:'🌋',difficulty:3,stats:{happiness:50,wealth:55,stability:40},mods:{eventMult:1.5,extraEvents:1,stabilityDecay:3}},polaris:{id:'polaris',icon:'❄️',difficulty:4,stats:{happiness:40,wealth:45,stability:80},mods:{eventMult:0.8,extraEvents:0,happinessDecay:3}}};
-    const SECTORS=[{id:'defence',icon:'🛡️'},{id:'education',icon:'📚'},{id:'health',icon:'🏥'},{id:'infra',icon:'🏗️'},{id:'welfare',icon:'🤝'}];
+    const loadContentFromCache=()=>{
+      try{
+        const cached=localStorage.getItem(CONTENT_CACHE_KEY);
+        if(cached){
+          const{data,timestamp}=JSON.parse(cached);
+          if(Date.now()-timestamp<CONTENT_CACHE_TTL){
+            console.log('✅ Content loaded from cache');
+            return data;
+          }
+        }
+      }catch(e){}
+      return null;
+    };
 
-    // ===== EVENTS =====
-    const EVENTS={
-      general:[
-        {id:'pandemic',icon:'🦠',title:{ru:'Эпидемия',en:'Pandemic',de:'Pandemie'},desc:{ru:'Опасный вирус распространяется. Эксперты спорят о происхождении.',en:'A dangerous virus is spreading. Experts argue about its origin.',de:'Ein gefährlicher Virus breitet sich aus.'},choices:[{text:{ru:'Жёсткий карантин',en:'Strict quarantine',de:'Strenge Quarantäne'},effects:{happiness:-20,wealth:-15,stability:10},cost:30},{text:{ru:'Умеренные меры',en:'Moderate measures',de:'Moderate Maßnahmen'},effects:{happiness:-10,wealth:-8,stability:5},cost:15},{text:{ru:'Не вмешиваться',en:'Do nothing',de:'Nichts tun'},effects:{happiness:5,stability:-20},cost:0}]},
-        {id:'strike',icon:'✊',title:{ru:'Забастовка',en:'Strike',de:'Streik'},desc:{ru:'Рабочие требуют улучшения условий.',en:'Workers demand better conditions.',de:'Arbeiter fordern bessere Bedingungen.'},choices:[{text:{ru:'Принять требования',en:'Accept demands',de:'Forderungen akzeptieren'},effects:{happiness:25,wealth:-20},cost:25},{text:{ru:'Частичные уступки',en:'Partial concessions',de:'Teilzugeständnisse'},effects:{happiness:10,wealth:-8,stability:5},cost:12},{text:{ru:'Подавить',en:'Suppress',de:'Unterdrücken'},effects:{happiness:-25,stability:-15,wealth:8},cost:15}]},
-        {id:'discovery',icon:'💎',title:{ru:'Месторождение!',en:'Discovery!',de:'Entdeckung!'},desc:{ru:'Геологи обнаружили огромные залежи ресурса.',en:'Geologists discovered huge deposits.',de:'Geologen haben riesige Vorkommen entdeckt.'},choices:[{text:{ru:'Национализировать',en:'Nationalize',de:'Verstaatlichen'},effects:{happiness:12,wealth:18,stability:5},cost:25,hydro:50},{text:{ru:'Корпорациям',en:'Corporations',de:'Konzerne'},effects:{wealth:30,happiness:-12},cost:5,hydro:30},{text:{ru:'Создать фонд',en:'Create fund',de:'Fonds gründen'},effects:{stability:20,wealth:10,happiness:8},cost:15,hydro:25}]},
-        {id:'drought',icon:'🏜️',title:{ru:'Засуха',en:'Drought',de:'Dürre'},desc:{ru:'Дождя не было месяц. Фермеры смотрят на небо.',en:'No rain for a month. Farmers stare at sky.',de:'Seit einem Monat kein Regen.'},choices:[{text:{ru:'Нормирование воды',en:'Water rationing',de:'Wasserrationierung'},effects:{happiness:-15,stability:10},cost:10},{text:{ru:'Срочная ирригация',en:'Emergency irrigation',de:'Notbewässerung'},effects:{wealth:-20,happiness:5,stability:5},cost:35},{text:{ru:'Импорт воды',en:'Import water',de:'Wasser importieren'},effects:{wealth:-15,stability:-5},cost:25}]},
-        {id:'techno_disaster',icon:'☢️',title:{ru:'Техногенная катастрофа',en:'Industrial Disaster',de:'Industriekatastrophe'},desc:{ru:'Что-то пошло не так на заводе.',en:'Something went wrong at the factory.',de:'Etwas ist schiefgelaufen.'},choices:[{text:{ru:'Эвакуация',en:'Evacuation',de:'Evakuierung'},effects:{happiness:-10,wealth:-15,stability:15},cost:30},{text:{ru:'Скрыть',en:'Hide',de:'Verbergen'},effects:{happiness:5,stability:-20},cost:10},{text:{ru:'Компенсации',en:'Compensation',de:'Entschädigung'},effects:{happiness:10,wealth:-25},cost:40}]},
-        {id:'infra_collapse',icon:'🌉',title:{ru:'Мост рухнул',en:'Bridge Collapsed',de:'Brücke eingestürzt'},desc:{ru:'Мост, который "ещё сто лет простоит", простоял до вторника.',en:'The bridge "meant to last 100 years" lasted until Tuesday.',de:'Die Brücke hielt bis Dienstag.'},choices:[{text:{ru:'Срочный ремонт',en:'Emergency repair',de:'Notreparatur'},effects:{wealth:-20,stability:10},cost:35},{text:{ru:'Объезд',en:'Detour',de:'Umleitung'},effects:{happiness:-15,wealth:-5},cost:10},{text:{ru:'Новый мост',en:'New bridge',de:'Neue Brücke'},effects:{wealth:-30,happiness:15,stability:15},cost:50}]},
-        {id:'journalism',icon:'📰',title:{ru:'Журналисты раскопали...',en:'Journalists uncovered...',de:'Journalisten aufgedeckt...'},desc:{ru:'Независимые журналисты раскопали что-то.',en:'Independent journalists uncovered something.',de:'Unabhängige Journalisten haben etwas aufgedeckt.'},choices:[{text:{ru:'Поддержать прессу',en:'Support press',de:'Presse unterstützen'},effects:{happiness:15,stability:-10},cost:5},{text:{ru:'Засекретить',en:'Classify',de:'Klassifizieren'},effects:{stability:10,happiness:-15},cost:20},{text:{ru:'Дискредитировать',en:'Discredit',de:'Diskreditieren'},effects:{happiness:-20,stability:5},cost:15}]},
-        {id:'rumors',icon:'🗣️',title:{ru:'Слухи',en:'Rumors',de:'Gerüchte'},desc:{ru:'Кто-то пустил слух. Половина колонии верит.',en:'Someone started a rumor. Half the colony believes it.',de:'Jemand hat ein Gerücht gestreut.'},choices:[{text:{ru:'Опровержение',en:'Denial',de:'Dementierung'},effects:{stability:5,happiness:-5},cost:5},{text:{ru:'Прозрачность',en:'Transparency',de:'Transparenz'},effects:{happiness:20,stability:-10,wealth:-5},cost:15},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{stability:-15},cost:0}]},
-        {id:'diplomatic_scandal',icon:'🤦',title:{ru:'Дипскандал',en:'Diplomatic Scandal',de:'Diplomatischer Skandal'},desc:{ru:'Ваш посол сказал что-то не то.',en:'Your ambassador said something wrong.',de:'Ihr Botschafter hat etwas Falsches gesagt.'},choices:[{text:{ru:'Извиниться',en:'Apologize',de:'Entschuldigen'},effects:{happiness:-5,stability:10},cost:10},{text:{ru:'Стоять на своём',en:'Stand firm',de:'Standhaft bleiben'},effects:{happiness:10,stability:-15},cost:0},{text:{ru:'Отозвать посла',en:'Recall ambassador',de:'Botschafter zurückrufen'},effects:{stability:5},cost:5}]},
-        {id:'tech_breakthrough',icon:'🔬',title:{ru:'Научный прорыв',en:'Scientific Breakthrough',de:'Durchbruch'},desc:{ru:'Учёные совершили открытие.',en:'Scientists made a discovery.',de:'Wissenschaftler haben eine Entdeckung gemacht.'},choices:[{text:{ru:'Финансирование',en:'Funding',de:'Finanzierung'},effects:{wealth:20,happiness:12,stability:5},cost:30},{text:{ru:'Поделиться',en:'Share',de:'Teilen'},effects:{happiness:15,stability:8},cost:10},{text:{ru:'Засекретить',en:'Classify',de:'Geheim halten'},effects:{wealth:12,stability:-8},cost:8}]},
-        {id:'festival',icon:'🎉',title:{ru:'Праздник',en:'Festival',de:'Festival'},desc:{ru:'Годовщина основания! Граждане ждут праздника.',en:'Anniversary! Citizens expect celebration.',de:'Jahrestag! Bürger erwarten Feier.'},choices:[{text:{ru:'Грандиозный',en:'Grand',de:'Groß'},effects:{happiness:25,wealth:-15},cost:25},{text:{ru:'Скромный',en:'Modest',de:'Bescheiden'},effects:{happiness:10,wealth:-5},cost:10},{text:{ru:'Рабочий день',en:'Working day',de:'Arbeitstag'},effects:{happiness:-15,wealth:5},cost:0}]},
-      ],
-      parliamentary:[
-        {id:'coalition',icon:'💔',title:{ru:'Развал коалиции',en:'Coalition Collapse',de:'Koalitionszerfall'},desc:{ru:'Партии не могут договориться.',en:'Parties can\'t agree.',de:'Parteien können sich nicht einigen.'},choices:[{text:{ru:'Переговоры',en:'Negotiate',de:'Verhandeln'},effects:{stability:-10,happiness:-5},cost:15},{text:{ru:'Новая коалиция',en:'New coalition',de:'Neue Koalition'},effects:{stability:5,happiness:10},cost:20},{text:{ru:'Выборы',en:'Elections',de:'Wahlen'},effects:{stability:-20,happiness:15},cost:30}]},
-        {id:'lobbyists',icon:'💼',title:{ru:'Лоббисты',en:'Lobbyists',de:'Lobbyisten'},desc:{ru:'Некоторые законы подозрительно выгодны компаниям.',en:'Some laws suspiciously benefit companies.',de:'Einige Gesetze sind verdächtig vorteilhaft.'},choices:[{text:{ru:'Реформа',en:'Reform',de:'Reform'},effects:{happiness:20,wealth:-10,stability:5},cost:20},{text:{ru:'Показательный процесс',en:'Show trial',de:'Schauprozess'},effects:{happiness:10,stability:-5},cost:10},{text:{ru:'Замять',en:'Cover up',de:'Vertuschen'},effects:{stability:-15,happiness:-10},cost:25}]},
-        {id:'deadlock',icon:'🔒',title:{ru:'Тупик',en:'Deadlock',de:'Sackgasse'},desc:{ru:'Депутаты не могут договориться уже неделю.',en:'MPs can\'t agree for a week.',de:'Abgeordnete können sich nicht einigen.'},choices:[{text:{ru:'Вмешаться',en:'Intervene',de:'Eingreifen'},effects:{stability:10,happiness:-10},cost:5},{text:{ru:'Ждать',en:'Wait',de:'Warten'},effects:{stability:-15,happiness:5},cost:0},{text:{ru:'Референдум',en:'Referendum',de:'Referendum'},effects:{happiness:15,wealth:-10},cost:20}]}
-      ],
-      presidential:[
-        {id:'impeachment',icon:'⚖️',title:{ru:'Импичмент',en:'Impeachment',de:'Amtsenthebung'},desc:{ru:'Оппозиция собрала голоса для обсуждения.',en:'Opposition gathered votes.',de:'Opposition hat Stimmen gesammelt.'},choices:[{text:{ru:'Договориться',en:'Negotiate',de:'Verhandeln'},effects:{stability:10,happiness:-5,wealth:-10},cost:20},{text:{ru:'Мобилизовать',en:'Mobilize',de:'Mobilisieren'},effects:{happiness:15,stability:-10},cost:15},{text:{ru:'Защита',en:'Defense',de:'Verteidigung'},effects:{stability:5,wealth:-15},cost:25}]},
-        {id:'admin_scandal',icon:'🗞️',title:{ru:'Скандал',en:'Scandal',de:'Skandal'},desc:{ru:'Ваш помощник сказал что-то не то.',en:'Your aide said something wrong.',de:'Ihr Berater hat etwas Falsches gesagt.'},choices:[{text:{ru:'Уволить',en:'Fire',de:'Entlassen'},effects:{stability:10,happiness:5},cost:5},{text:{ru:'Защитить',en:'Defend',de:'Verteidigen'},effects:{happiness:-10,stability:-5},cost:0},{text:{ru:'Отвлечь',en:'Distract',de:'Ablenken'},effects:{happiness:-5,wealth:-10},cost:15}]},
-        {id:'constitutional',icon:'📜',title:{ru:'Конституционный кризис',en:'Constitutional Crisis',de:'Verfassungskrise'},desc:{ru:'Суд и Парламент не согласны с вами.',en:'Court and Parliament disagree.',de:'Gericht und Parlament anderer Meinung.'},choices:[{text:{ru:'Уступить',en:'Yield',de:'Nachgeben'},effects:{stability:15,happiness:-10},cost:0},{text:{ru:'Реформа',en:'Reform',de:'Reform'},effects:{stability:-15,happiness:10,wealth:-20},cost:30},{text:{ru:'К народу',en:'To people',de:'Zum Volk'},effects:{happiness:20,stability:-10},cost:15}]}
-      ],
-      monarchy:[
-        {id:'heir_scandal',icon:'👑',title:{ru:'Скандал наследника',en:'Heir Scandal',de:'Erben-Skandal'},desc:{ru:'Наследник посетил сомнительное заведение.',en:'Heir visited questionable place.',de:'Erbe besuchte fragwürdigen Ort.'},choices:[{text:{ru:'Извинение',en:'Apology',de:'Entschuldigung'},effects:{happiness:5,stability:10},cost:5},{text:{ru:'Защитить',en:'Defend',de:'Verteidigen'},effects:{happiness:-10,stability:-5},cost:0},{text:{ru:'В "отпуск"',en:'"Vacation"',de:'"Urlaub"'},effects:{stability:15,happiness:-5},cost:20}]},
-        {id:'succession',icon:'⚔️',title:{ru:'Наследование',en:'Succession',de:'Erbfolge'},desc:{ru:'Три претендента на трон.',en:'Three claimants to the throne.',de:'Drei Thronprätendenten.'},choices:[{text:{ru:'Совет',en:'Council',de:'Rat'},effects:{stability:15,happiness:-5},cost:10},{text:{ru:'Голосование',en:'Vote',de:'Abstimmung'},effects:{happiness:20,stability:-15},cost:25},{text:{ru:'Назначить',en:'Appoint',de:'Ernennen'},effects:{stability:-10,happiness:-10},cost:0}]},
-        {id:'republicans',icon:'🗽',title:{ru:'Республиканцы',en:'Republicans',de:'Republikaner'},desc:{ru:'Часть граждан против монархии.',en:'Some citizens against monarchy.',de:'Einige Bürger gegen Monarchie.'},choices:[{text:{ru:'Диалог',en:'Dialogue',de:'Dialog'},effects:{happiness:10,stability:5},cost:10},{text:{ru:'Традиции',en:'Traditions',de:'Traditionen'},effects:{happiness:-5,stability:15},cost:15},{text:{ru:'Запретить',en:'Ban',de:'Verbieten'},effects:{stability:-20,happiness:-15},cost:20}]}
-      ],
-      dictatorship:[
-        {id:'generals',icon:'🎖️',title:{ru:'Заговор генералов',en:'Generals\' Conspiracy',de:'Generalsverschwörung'},desc:{ru:'Генералы часто обедают вместе.',en:'Generals lunch together often.',de:'Generäle essen oft zusammen.'},choices:[{text:{ru:'Арест',en:'Arrest',de:'Verhaftung'},effects:{stability:20,happiness:-15},cost:20},{text:{ru:'Перетасовать',en:'Shuffle',de:'Umstrukturieren'},effects:{stability:10,happiness:-5},cost:10},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{stability:-25},cost:0}]},
-        {id:'cult',icon:'🗿',title:{ru:'Культ личности',en:'Personality Cult',de:'Personenkult'},desc:{ru:'Статуй больше, чем жителей.',en:'More statues than residents.',de:'Mehr Statuen als Einwohner.'},choices:[{text:{ru:'Ещё больше!',en:'Even more!',de:'Noch mehr!'},effects:{happiness:-20,stability:10,wealth:-15},cost:25},{text:{ru:'Умеренность',en:'Moderation',de:'Mäßigung'},effects:{happiness:10,stability:-5},cost:0},{text:{ru:'Музеи',en:'Museums',de:'Museen'},effects:{happiness:15,wealth:-5},cost:10}]},
-        {id:'resistance',icon:'📢',title:{ru:'Сопротивление',en:'Resistance',de:'Widerstand'},desc:{ru:'Листовки появляются быстрее, чем их собирают.',en:'Leaflets appear faster than collected.',de:'Flugblätter erscheinen schneller.'},choices:[{text:{ru:'Репрессии',en:'Repression',de:'Repression'},effects:{stability:15,happiness:-25},cost:25},{text:{ru:'Инфильтрация',en:'Infiltration',de:'Infiltration'},effects:{stability:10,happiness:-10,wealth:-10},cost:20},{text:{ru:'Реформы',en:'Reforms',de:'Reformen'},effects:{happiness:20,stability:-15},cost:15}]}
-      ],
-      technocracy:[
-        {id:'algorithm',icon:'🤖',title:{ru:'Бунт против алгоритмов',en:'Algorithm Revolt',de:'Algorithmus-Revolte'},desc:{ru:'Граждане против "машин".',en:'Citizens against "machines".',de:'Bürger gegen "Maschinen".'},choices:[{text:{ru:'Гуманизировать',en:'Humanize',de:'Humanisieren'},effects:{happiness:20,wealth:-10},cost:15},{text:{ru:'Объяснить',en:'Explain',de:'Erklären'},effects:{happiness:5,stability:5},cost:10},{text:{ru:'Игнорировать',en:'Ignore',de:'Ignorieren'},effects:{happiness:-15,stability:-10},cost:0}]},
-        {id:'data_leak',icon:'💾',title:{ru:'Утечка данных',en:'Data Leak',de:'Datenleck'},desc:{ru:'Кто-то слил базу данных.',en:'Someone leaked the database.',de:'Jemand hat Datenbank geleakt.'},choices:[{text:{ru:'Аудит',en:'Audit',de:'Audit'},effects:{stability:15,wealth:-20},cost:30},{text:{ru:'Найти виновного',en:'Find culprit',de:'Schuldigen finden'},effects:{stability:5,happiness:-5},cost:15},{text:{ru:'Амнистия',en:'Amnesty',de:'Amnestie'},effects:{happiness:15,stability:-10},cost:5}]},
-        {id:'experts',icon:'🔬',title:{ru:'Эксперты спорят',en:'Experts Disagree',de:'Experten uneinig'},desc:{ru:'Климат vs экономика. 500 страниц с каждой стороны.',en:'Climate vs economy. 500 pages each side.',de:'Klima vs Wirtschaft. 500 Seiten pro Seite.'},choices:[{text:{ru:'Климат',en:'Climate',de:'Klima'},effects:{happiness:10,wealth:-15,stability:5},cost:20},{text:{ru:'Экономика',en:'Economy',de:'Wirtschaft'},effects:{wealth:15,happiness:-10,stability:5},cost:10},{text:{ru:'Комиссия',en:'Commission',de:'Kommission'},effects:{stability:-10,wealth:-10},cost:15}]}
-      ],
-      direct:[
-        {id:'fatigue',icon:'😴',title:{ru:'Усталость',en:'Fatigue',de:'Müdigkeit'},desc:{ru:'Явка 12%. Тема: обязательные референдумы.',en:'Turnout 12%. Topic: mandatory referendums.',de:'Wahlbeteiligung 12%.'},choices:[{text:{ru:'Обязательное',en:'Mandatory',de:'Obligatorisch'},effects:{happiness:-15,stability:15},cost:20},{text:{ru:'Упростить',en:'Simplify',de:'Vereinfachen'},effects:{happiness:10,wealth:-10},cost:15},{text:{ru:'Меньше',en:'Fewer',de:'Weniger'},effects:{happiness:5,stability:-10},cost:0}]},
-        {id:'populist',icon:'🎪',title:{ru:'Популизм',en:'Populism',de:'Populismus'},desc:{ru:'Голосование: бесплатный космический корабль каждому.',en:'Vote: free spaceship for everyone.',de:'Abstimmung: kostenloses Raumschiff für jeden.'},choices:[{text:{ru:'Объяснить',en:'Explain',de:'Erklären'},effects:{happiness:-10,stability:10},cost:10},{text:{ru:'Компромисс',en:'Compromise',de:'Kompromiss'},effects:{happiness:15,wealth:-20},cost:25},{text:{ru:'Пусть голосуют',en:'Let vote',de:'Abstimmen lassen'},effects:{stability:-15,happiness:5},cost:5}]},
-        {id:'tie',icon:'⚖️',title:{ru:'50/50',en:'50/50',de:'50/50'},desc:{ru:'Голосование 50.0% на 50.0%. Монетку?',en:'Vote 50.0% to 50.0%. Flip coin?',de:'50,0% zu 50,0%. Münze werfen?'},choices:[{text:{ru:'Повторить',en:'Revote',de:'Erneut'},effects:{stability:-5,wealth:-10},cost:15},{text:{ru:'Координатор решит',en:'Coordinator decides',de:'Koordinator entscheidet'},effects:{happiness:-10,stability:10},cost:0},{text:{ru:'Компромисс',en:'Compromise',de:'Kompromiss'},effects:{happiness:5,stability:5},cost:10}]}
-      ]
+    // Transform DB data to game format
+    const transformContent=(data)=>{
+      if(!data)return null;
+      
+      // UI Texts -> T object
+      const T={ui:{},intro:{},systems:{},planets:{},sectors:{},defeat:{},victoryMsg:{}};
+      (data.ui_texts||[]).forEach(t=>{
+        const[category,...rest]=t.key.split('.');
+        const key=rest.join('.');
+        if(T[category]!==undefined){
+          if(key)T[category][key]=t.value;
+          else Object.assign(T[category],t.value);
+        }
+      });
+      
+      // Systems
+      const SYSTEMS={};
+      (data.systems||[]).forEach(s=>{
+        SYSTEMS[s.id]={
+          id:s.id,icon:s.icon,premium:s.is_premium,
+          traits:s.traits||{},
+          name:s.name,leader:s.leader,desc:s.description,pros:s.pros,cons:s.cons
+        };
+      });
+      
+      // Planets
+      const PLANETS={};
+      (data.planets||[]).forEach(p=>{
+        PLANETS[p.id]={
+          id:p.id,icon:p.icon,difficulty:p.difficulty,
+          stats:p.stats||{happiness:50,wealth:50,stability:50},
+          mods:p.mods||{},
+          name:p.name,desc:p.description,traits:p.traits,quote:p.quote
+        };
+      });
+      
+      // Events
+      const EVENTS={general:[],parliamentary:[],presidential:[],monarchy:[],dictatorship:[],technocracy:[],direct:[]};
+      (data.events||[]).forEach(e=>{
+        const event={
+          id:e.id,icon:e.icon,title:e.title,desc:e.description,
+          choices:(e.choices||[]).map(c=>({text:c.text,effects:c.effects||{},cost:c.cost||0,hydro:c.hydro||0}))
+        };
+        if(EVENTS[e.system])EVENTS[e.system].push(event);
+        else EVENTS.general.push(event);
+      });
+      
+      // Sectors
+      const SECTORS=(data.sectors||[]).map(s=>({id:s.id,icon:s.icon,name:s.name}));
+      
+      // Difficulties
+      const DIFFICULTIES={};
+      (data.difficulties||[]).forEach(d=>{
+        DIFFICULTIES[d.id]={icon:d.icon,name:d.name,bonus:d.bonus||0,hydroBonus:d.hydro_bonus||0,severity:d.severity||1.0};
+      });
+      
+      // Languages
+      const LANGUAGES=(data.languages||[]).map(l=>({code:l.code,flag:l.flag,name:l.native_name||l.name}));
+      
+      return{T,SYSTEMS,PLANETS,EVENTS,SECTORS,DIFFICULTIES,LANGUAGES};
+    };
+
+    // ===== CONTENT CONTEXT =====
+    const ContentContext=createContext(null);
+    const useGameContent=()=>useContext(ContentContext);
+
+    function ContentProvider({children}){
+      const[content,setContent]=useState(null);
+      const[loading,setLoading]=useState(true);
+
+      useEffect(()=>{
+        const load=async()=>{
+          // Try cache first for fast load
+          const cached=loadContentFromCache();
+          if(cached){
+            setContent(transformContent(cached));
+            setLoading(false);
+          }
+          
+          // Load fresh from DB in background
+          const fresh=await loadContentFromDB();
+          if(fresh){
+            setContent(transformContent(fresh));
+          }
+          setLoading(false);
+        };
+        load();
+      },[]);
+
+      if(loading&&!content){
+        return(<div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"/>
+            <p className="text-amber-300">Loading...</p>
+          </div>
+        </div>);
+      }
+
+      // Fallback to hardcoded if DB failed
+      if(!content){
+        console.warn('⚠️ Using fallback content');
+        setContent(transformContent(null)||FALLBACK_CONTENT);
+      }
+
+      return(<ContentContext.Provider value={content}>{children}</ContentContext.Provider>);
+    }
+
+
+    // ===== FALLBACK CONTENT (when DB unavailable) =====
+    const FALLBACK_CONTENT={
+      T:{
+        ui:{title:{ru:'INDEPENDENCE',en:'INDEPENDENCE',de:'INDEPENDENCE'},subtitle:{ru:'ОБРАЗОВАТЕЛЬНАЯ ИГРА О ПОЛИТИКЕ',en:'CIVIC EDUCATION GAME',de:'POLITISCHES BILDUNGSSPIEL'},login:{ru:'Войти',en:'Login',de:'Anmelden'},register:{ru:'Регистрация',en:'Register',de:'Registrieren'},premium:{ru:'Premium',en:'Premium',de:'Premium'},premiumPrice:{ru:'£2.99/мес',en:'£2.99/mo',de:'£2.99/Mo'},startGame:{ru:'Начать игру',en:'Start Game',de:'Spiel starten'},year:{ru:'Год',en:'Year',de:'Jahr'},submit:{ru:'Утвердить бюджет',en:'Submit Budget',de:'Budget bestätigen'},happiness:{ru:'Счастье',en:'Happiness',de:'Zufriedenheit'},wealth:{ru:'Богатство',en:'Wealth',de:'Wohlstand'},stability:{ru:'Стабильность',en:'Stability',de:'Stabilität'},budget:{ru:'Бюджет',en:'Budget',de:'Budget'},victory:{ru:'ПОБЕДА!',en:'VICTORY!',de:'SIEG!'},defeat:{ru:'ПОРАЖЕНИЕ',en:'DEFEAT',de:'NIEDERLAGE'},playAgain:{ru:'Играть снова',en:'Play Again',de:'Nochmal spielen'},back:{ru:'Назад',en:'Back',de:'Zurück'},next:{ru:'Далее',en:'Next',de:'Weiter'},close:{ru:'Закрыть',en:'Close',de:'Schließen'},easy:{ru:'Легко',en:'Easy',de:'Leicht'},normal:{ru:'Нормально',en:'Normal',de:'Normal'},hard:{ru:'Сложно',en:'Hard',de:'Schwer'},years:{ru:'лет',en:'years',de:'Jahre'},choosePlanet:{ru:'Выберите планету',en:'Choose Planet',de:'Planet wählen'},score:{ru:'Очки',en:'Score',de:'Punkte'},signOut:{ru:'Выйти',en:'Sign Out',de:'Abmelden'},email:{ru:'Email',en:'Email',de:'E-Mail'},password:{ru:'Пароль',en:'Password',de:'Passwort'},username:{ru:'Имя',en:'Username',de:'Name'},loading:{ru:'Загрузка...',en:'Loading...',de:'Lädt...'},selectLanguage:{ru:'Выберите язык',en:'Select Language',de:'Sprache wählen'},advancedSettings:{ru:'Расширенные настройки',en:'Advanced Settings',de:'Erweiterte Einstellungen'},target:{ru:'Цель',en:'Target',de:'Ziel'},gameLength:{ru:'Длина игры',en:'Game length',de:'Spiellänge'},eventsPerTurn:{ru:'Событий за ход',en:'Events per turn',de:'Ereignisse pro Zug'},difficulty:{ru:'Сложность',en:'Difficulty',de:'Schwierigkeit'},politicalSystem:{ru:'Политическая система',en:'Political System',de:'Politisches System'},profile:{ru:'Профиль',en:'Profile',de:'Profil'},skip:{ru:'Пропустить',en:'Skip',de:'Überspringen'}},
+        intro:{title:{ru:'Поздравляем, уважаемый Основатель!',en:'Congratulations, esteemed Founder!',de:'Herzlichen Glückwunsch!'},p1:{ru:'Ваш корабль приземлился на планете.',en:'Your ship has landed on a planet.',de:'Ihr Schiff ist gelandet.'},p2:{ru:'Постройте идеальное общество.',en:'Build a perfect society.',de:'Bauen Sie eine perfekte Gesellschaft.'},p3:{ru:'Или не очень идеальное.',en:'Or not so perfect.',de:'Oder nicht so perfekt.'},mission:{ru:'Ваша задача: создать процветающую цивилизацию.',en:'Your mission: create a thriving civilization.',de:'Ihre Mission: eine blühende Zivilisation.'}},
+        systems:{parliamentary:{name:{ru:'Парламентская демократия',en:'Parliamentary Democracy',de:'Parlamentarische Demokratie'},leader:{ru:'Премьер-министр',en:'Prime Minister',de:'Premierminister'},desc:{ru:'Демократия с парламентом.',en:'Democracy with parliament.',de:'Demokratie mit Parlament.'},pros:{ru:'Стабильность',en:'Stability',de:'Stabilität'},cons:{ru:'Медленные решения',en:'Slow decisions',de:'Langsame Entscheidungen'}},presidential:{name:{ru:'Президентская республика',en:'Presidential Republic',de:'Präsidialrepublik'},leader:{ru:'Президент',en:'President',de:'Präsident'},desc:{ru:'Один лидер, много власти.',en:'One leader, much power.',de:'Ein Führer, viel Macht.'},pros:{ru:'Быстрые решения',en:'Fast decisions',de:'Schnelle Entscheidungen'},cons:{ru:'Всё на вас',en:'All on you',de:'Alles auf Ihnen'}},monarchy:{name:{ru:'Монархия',en:'Monarchy',de:'Monarchie'},leader:{ru:'Монарх',en:'Monarch',de:'Monarch'},desc:{ru:'Традиции и корона.',en:'Traditions and crown.',de:'Traditionen und Krone.'},pros:{ru:'+10 стабильность',en:'+10 stability',de:'+10 Stabilität'},cons:{ru:'Риск восстания',en:'Rebellion risk',de:'Aufstandsrisiko'}},dictatorship:{name:{ru:'Диктатура',en:'Dictatorship',de:'Diktatur'},leader:{ru:'Верховный лидер',en:'Supreme Leader',de:'Oberster Führer'},desc:{ru:'Эффективность превыше всего.',en:'Efficiency above all.',de:'Effizienz über alles.'},pros:{ru:'Максимальная эффективность',en:'Maximum efficiency',de:'Maximale Effizienz'},cons:{ru:'Риск переворота',en:'Coup risk',de:'Putschrisiko'}},technocracy:{name:{ru:'Технократия',en:'Technocracy',de:'Technokratie'},leader:{ru:'Главный технолог',en:'Chief Technologist',de:'Cheftechnologe'},desc:{ru:'Эксперты у власти.',en:'Experts in power.',de:'Experten an der Macht.'},pros:{ru:'+15 богатство',en:'+15 wealth',de:'+15 Wohlstand'},cons:{ru:'Люди как данные',en:'People as data',de:'Menschen als Daten'}},direct:{name:{ru:'Прямая демократия',en:'Direct Democracy',de:'Direkte Demokratie'},leader:{ru:'Координатор',en:'Coordinator',de:'Koordinator'},desc:{ru:'Каждый голос важен.',en:'Every voice matters.',de:'Jede Stimme zählt.'},pros:{ru:'Легитимность',en:'Legitimacy',de:'Legitimität'},cons:{ru:'Очень медленно',en:'Very slow',de:'Sehr langsam'}}},
+        planets:{terranova:{name:{ru:'Терра Нова',en:'Terra Nova',de:'Terra Nova'},desc:{ru:'Планета-близнец Земли.',en:'Earth twin planet.',de:'Erdähnlicher Planet.'},traits:{ru:'Сбалансированная',en:'Balanced',de:'Ausgewogen'},quote:{ru:'«Предсказуемость»',en:'"Predictability"',de:'„Vorhersehbarkeit"'}},aridia:{name:{ru:'Аридия',en:'Aridia',de:'Aridia'},desc:{ru:'Пустынный мир.',en:'Desert world.',de:'Wüstenwelt.'},traits:{ru:'Пустыня',en:'Desert',de:'Wüste'},quote:{ru:'«Жарко»',en:'"Hot"',de:'„Heiß"'}},edemia:{name:{ru:'Эдемия',en:'Edemia',de:'Edemia'},desc:{ru:'Рай.',en:'Paradise.',de:'Paradies.'},traits:{ru:'Богатая',en:'Rich',de:'Reich'},quote:{ru:'«Рай»',en:'"Paradise"',de:'„Paradies"'}},chaosprime:{name:{ru:'Хаос Прайм',en:'Chaos Prime',de:'Chaos Prime'},desc:{ru:'Хаос.',en:'Chaos.',de:'Chaos.'},traits:{ru:'Хаос',en:'Chaos',de:'Chaos'},quote:{ru:'«Хаос»',en:'"Chaos"',de:'„Chaos"'}},polaris:{name:{ru:'Полярис',en:'Polaris',de:'Polaris'},desc:{ru:'Холодный мир.',en:'Cold world.',de:'Kalte Welt.'},traits:{ru:'Холод',en:'Cold',de:'Kalt'},quote:{ru:'«Холодно»',en:'"Cold"',de:'„Kalt"'}}},
+        sectors:{defence:{name:{ru:'Оборона',en:'Defence',de:'Verteidigung'}},education:{name:{ru:'Образование',en:'Education',de:'Bildung'}},health:{name:{ru:'Здравоохранение',en:'Healthcare',de:'Gesundheit'}},infra:{name:{ru:'Инфраструктура',en:'Infrastructure',de:'Infrastruktur'}},welfare:{name:{ru:'Соцзащита',en:'Welfare',de:'Soziales'}}},
+        defeat:{happiness:{ru:'Народ восстал!',en:'People revolted!',de:'Volk rebelliert!'},stability:{ru:'Хаос!',en:'Chaos!',de:'Chaos!'},rebellion:{ru:'Мятеж!',en:'Rebellion!',de:'Aufstand!'},coup:{ru:'Переворот!',en:'Coup!',de:'Putsch!'},targets:{ru:'Цели не достигнуты!',en:'Targets not met!',de:'Ziele nicht erreicht!'}},
+        victoryMsg:{utopia:{ru:'Утопия!',en:'Utopia!',de:'Utopie!'},prosperity:{ru:'Процветание!',en:'Prosperity!',de:'Wohlstand!'},survival:{ru:'Вы выжили!',en:'You survived!',de:'Sie haben überlebt!'}}
+      },
+      SYSTEMS:{parliamentary:{id:'parliamentary',icon:'🏛️',premium:false,traits:{needsApproval:true,threshold:40,stabilityBonus:0,happinessDecay:0,wealthBonus:0}},presidential:{id:'presidential',icon:'🦅',premium:false,traits:{needsApproval:false,stabilityBonus:0,happinessDecay:0,wealthBonus:5}},monarchy:{id:'monarchy',icon:'👑',premium:true,traits:{needsApproval:false,stabilityBonus:10,happinessDecay:0,wealthBonus:0,rebellionRisk:25}},dictatorship:{id:'dictatorship',icon:'⚔️',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:5,wealthBonus:0,coupRisk:30}},technocracy:{id:'technocracy',icon:'🔬',premium:true,traits:{needsApproval:false,stabilityBonus:5,happinessDecay:2,wealthBonus:15,startPenalty:10}},direct:{id:'direct',icon:'🗳️',premium:true,traits:{needsApproval:false,stabilityBonus:-5,happinessDecay:-3,wealthBonus:0,referendumChance:0.25}}},
+      PLANETS:{terranova:{id:'terranova',icon:'🌍',difficulty:2,stats:{happiness:60,wealth:50,stability:70},mods:{eventMult:1.0,extraEvents:0}},aridia:{id:'aridia',icon:'🏜️',difficulty:4,stats:{happiness:45,wealth:35,stability:60},mods:{eventMult:1.2,happinessDecay:2}},edemia:{id:'edemia',icon:'🌴',difficulty:2,stats:{happiness:75,wealth:70,stability:55},mods:{eventMult:1.0,stabilityDecay:2}},chaosprime:{id:'chaosprime',icon:'🌋',difficulty:3,stats:{happiness:50,wealth:55,stability:40},mods:{eventMult:1.5,extraEvents:1,stabilityDecay:3}},polaris:{id:'polaris',icon:'❄️',difficulty:4,stats:{happiness:40,wealth:45,stability:80},mods:{eventMult:0.8,happinessDecay:3}}},
+      EVENTS:{general:[{id:'pandemic',icon:'🦠',title:{ru:'Эпидемия',en:'Pandemic',de:'Pandemie'},desc:{ru:'Вирус распространяется.',en:'Virus spreading.',de:'Virus breitet sich aus.'},choices:[{text:{ru:'Карантин',en:'Quarantine',de:'Quarantäne'},effects:{happiness:-20,stability:10},cost:30},{text:{ru:'Ничего',en:'Nothing',de:'Nichts'},effects:{stability:-20},cost:0}]}],parliamentary:[],presidential:[],monarchy:[],dictatorship:[],technocracy:[],direct:[]},
+      SECTORS:[{id:'defence',icon:'🛡️'},{id:'education',icon:'📚'},{id:'health',icon:'🏥'},{id:'infra',icon:'🏗️'},{id:'welfare',icon:'🤝'}],
+      DIFFICULTIES:{easy:{icon:'😊',bonus:10,hydroBonus:30,severity:0.7},normal:{icon:'😐',bonus:0,hydroBonus:0,severity:1.0},hard:{icon:'😰',bonus:-10,hydroBonus:-20,severity:1.3}},
+      LANGUAGES:[{code:'ru',flag:'🇷🇺',name:'Русский'},{code:'en',flag:'🇬🇧',name:'English'},{code:'de',flag:'🇩🇪',name:'Deutsch'}]
     };
 
     // ===== DB HELPERS =====
@@ -293,6 +331,8 @@
     function Game(){
       const{user,profile,loading:authLoading,initialized}=useAuth();
       const{lang,setLang,t}=useLang();
+      const content=useGameContent();
+      const{T,SYSTEMS,PLANETS,EVENTS,SECTORS,DIFFICULTIES,LANGUAGES}=content||FALLBACK_CONTENT;
 
       const[phase,setPhase]=useState('lang');
       const[turn,setTurn]=useState(1);
@@ -437,7 +477,7 @@
 
       // LANG SELECT
       if(phase==='lang'){
-        return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4"><StarBackground/><div className="text-center relative z-10 animate-fadeIn"><h1 className="text-4xl font-display font-bold gold-gradient mb-8">INDEPENDENCE</h1><p className="text-gray-400 mb-6">{T.ui.selectLanguage.ru}</p><div className="space-y-3">{[{id:'ru',flag:'🇷🇺',name:'Русский'},{id:'en',flag:'🇬🇧',name:'English'},{id:'de',flag:'🇩🇪',name:'Deutsch'}].map(l=>(<button key={l.id} onClick={()=>{setLang(l.id);setPhase('intro');}} className="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-4 bg-slate-800/50 border border-amber-500/30 rounded-xl hover:bg-slate-700/50 text-lg"><span className="text-2xl">{l.flag}</span><span>{l.name}</span></button>))}</div><button onClick={()=>{localStorage.clear();sessionStorage.clear();location.reload();}} className="mt-8 text-gray-600 hover:text-gray-400 text-xs">🔄 Reset</button></div></div>);
+        return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4"><StarBackground/><div className="text-center relative z-10 animate-fadeIn"><h1 className="text-4xl font-display font-bold gold-gradient mb-8">INDEPENDENCE</h1><p className="text-gray-400 mb-6">Select Language</p><div className="space-y-3">{LANGUAGES.map(l=>(<button key={l.code} onClick={()=>{setLang(l.code);setPhase('intro');}} className="w-full max-w-xs mx-auto flex items-center justify-center gap-3 py-4 bg-slate-800/50 border border-amber-500/30 rounded-xl hover:bg-slate-700/50 text-lg"><span className="text-2xl">{l.flag}</span><span>{l.name}</span></button>))}</div><button onClick={()=>{localStorage.clear();sessionStorage.clear();location.reload();}} className="mt-8 text-gray-600 hover:text-gray-400 text-xs">🔄 Reset</button></div></div>);
       }
 
       // INTRO
@@ -517,7 +557,7 @@
       return null;
     }
 
-    function App(){return(<AuthProvider><LangProvider><Game/></LangProvider></AuthProvider>);}
+    function App(){return(<ContentProvider><AuthProvider><LangProvider><Game/></LangProvider></AuthProvider></ContentProvider>);}
     ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
   </script>
   <script>
