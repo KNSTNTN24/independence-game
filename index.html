@@ -240,7 +240,22 @@
 
     // ===== DB HELPERS =====
     const db={
-      async saveGameResult(userId,data){return await supabase.from('game_results').insert({user_id:userId,planet_name:data.planet,political_system:data.system,difficulty:data.difficulty,max_turns:data.maxTurns,turns_played:data.turn,final_happiness:Math.round(data.stats.happiness),final_wealth:Math.round(data.stats.wealth),final_stability:Math.round(data.stats.stability),final_hydrobite:data.hydrobite,is_victory:data.isVictory,victory_type:data.victoryType,score:data.score,duration_seconds:data.duration});},
+      async saveGameResult(userId,data){
+        // Save game result
+        const result=await supabase.from('game_results').insert({user_id:userId,planet_name:data.planet,political_system:data.system,difficulty:data.difficulty,max_turns:data.maxTurns,turns_played:data.turn,final_happiness:Math.round(data.stats.happiness),final_wealth:Math.round(data.stats.wealth),final_stability:Math.round(data.stats.stability),final_hydrobite:data.hydrobite,is_victory:data.isVictory,victory_type:data.victoryType,score:data.score,duration_seconds:data.duration});
+        
+        // Update profile stats
+        const{data:profile}=await supabase.from('profiles').select('total_games,total_wins,highest_score').eq('id',userId).single();
+        if(profile){
+          const updates={
+            total_games:(profile.total_games||0)+1,
+            total_wins:(profile.total_wins||0)+(data.isVictory?1:0),
+            highest_score:Math.max(profile.highest_score||0,data.score||0)
+          };
+          await supabase.from('profiles').update(updates).eq('id',userId);
+        }
+        return result;
+      },
       async getLeaderboard(limit=30){return await supabase.from('profiles').select('id,username,display_name,total_games,total_wins,highest_score').gt('total_games',0).order('highest_score',{ascending:false}).limit(limit);},
       async getUserAchievements(userId){return await supabase.from('user_achievements').select('*,achievements(*)').eq('user_id',userId);},
       async unlockAchievement(userId,achievementId){return await supabase.from('user_achievements').upsert({user_id:userId,achievement_id:achievementId},{onConflict:'user_id,achievement_id'});},
@@ -283,8 +298,9 @@
       const signUp=async(email,password,username)=>{const{data,error}=await supabase.auth.signUp({email,password,options:{data:{username,full_name:username}}});if(error)throw error;return data;};
       const signIn=async(email,password)=>{const{data,error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error;return data;};
       const signOut=async()=>{await supabase.auth.signOut();setUser(null);setProfile(null);};
+      const refreshProfile=async()=>{if(user)await loadProfile(user.id);};
 
-      return(<AuthContext.Provider value={{user,profile,loading,initialized,signUp,signIn,signOut}}>{children}</AuthContext.Provider>);
+      return(<AuthContext.Provider value={{user,profile,loading,initialized,signUp,signIn,signOut,refreshProfile}}>{children}</AuthContext.Provider>);
     }
 
     // ===== LANG CONTEXT =====
@@ -342,7 +358,7 @@
 
     // ===== MAIN GAME =====
     function Game(){
-      const{user,profile,loading:authLoading,initialized}=useAuth();
+      const{user,profile,loading:authLoading,initialized,refreshProfile}=useAuth();
       const{lang,setLang,t}=useLang();
       const content=useGameContent();
       const{T,SYSTEMS,PLANETS,EVENTS,SECTORS,DIFFICULTIES,LANGUAGES}=content||FALLBACK_CONTENT;
@@ -402,11 +418,14 @@
         const score=calculateScore(stats,turn,isVictory);
         setFinalScore(score);setVictoryType(vType);
         if(user){
-          const gameData={planet:T.planets[planetId].name[lang],system,difficulty,maxTurns,turn,stats,hydrobite,isVictory,victoryType:vType,score,duration:0};
-          await db.saveGameResult(user.id,gameData);
+          const gameData={planet:T.planets[planetId]?.name?.[lang]||planetId,system,difficulty,maxTurns,turn,stats,hydrobite,isVictory,victoryType:vType,score,duration:0};
+          try{
+            await db.saveGameResult(user.id,gameData);
+            if(refreshProfile)await refreshProfile();
+          }catch(e){console.error('Save error:',e);}
         }
         setPhase(isVictory?'victory':'gameover');
-      },[user,planetId,system,difficulty,maxTurns,turn,stats,hydrobite,lang,calculateScore]);
+      },[user,planetId,system,difficulty,maxTurns,turn,stats,hydrobite,lang,calculateScore,refreshProfile]);
 
       const startGame=useCallback(()=>{
         if(!isPremium&&SYSTEMS[system].premium){showToast('🔒 Premium required!','warning');return;}
