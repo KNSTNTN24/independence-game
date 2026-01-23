@@ -242,7 +242,22 @@
     const db={
       async saveGameResult(userId,data){
         // Save game result
-        const result=await supabase.from('game_results').insert({user_id:userId,planet_name:data.planet,political_system:data.system,difficulty:data.difficulty,max_turns:data.maxTurns,turns_played:data.turn,final_happiness:Math.round(data.stats.happiness),final_wealth:Math.round(data.stats.wealth),final_stability:Math.round(data.stats.stability),final_hydrobite:data.hydrobite,is_victory:data.isVictory,victory_type:data.victoryType,score:data.score,duration_seconds:data.duration});
+        const result=await supabase.from('game_results').insert({
+          user_id:userId,
+          planet_name:data.planet,
+          political_system:data.system,
+          difficulty:data.difficulty,
+          max_turns:data.maxTurns,
+          final_turn:data.turn,
+          final_happiness:Math.round(data.stats.happiness),
+          final_wealth:Math.round(data.stats.wealth),
+          final_stability:Math.round(data.stats.stability),
+          final_hydrobite:data.hydrobite||0,
+          is_victory:data.isVictory,
+          victory_type:data.victoryType||null,
+          score:data.score||0,
+          duration_seconds:data.duration||0
+        });
         
         // Update profile stats
         const{data:profile}=await supabase.from('profiles').select('total_games,total_wins,highest_score').eq('id',userId).single();
