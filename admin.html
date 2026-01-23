@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Independence Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    .json-editor { font-family: monospace; font-size: 12px; }
+    .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; }
+    .lang-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .lang-ru { background: #3b82f6; color: white; }
+    .lang-en { background: #ef4444; color: white; }
+    .lang-de { background: #fbbf24; color: black; }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  <div id="app"></div>
+
+  <script type="module">
+    // ===== CONFIG =====
+    const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ===== STATE =====
+    let state = {
+      user: null,
+      profile: null,
+      loading: true,
+      activeTab: 'events',
+      data: {},
+      editing: null,
+      languages: ['ru', 'en', 'de']
+    };
+
+    const TABLES = {
+      events: { 
+        name: 'События', 
+        icon: '⚡', 
+        table: 'events',
+        fields: [
+          { key: 'id', type: 'text', required: true, label: 'ID (уникальный)' },
+          { key: 'icon', type: 'text', label: 'Иконка (emoji)' },
+          { key: 'system', type: 'select', label: 'Система', options: ['general', 'parliamentary', 'presidential', 'monarchy', 'dictatorship', 'technocracy', 'direct'] },
+          { key: 'title', type: 'jsonb', label: 'Заголовок' },
+          { key: 'description', type: 'jsonb', label: 'Описание' },
+          { key: 'choices', type: 'choices', label: 'Варианты ответов' },
+          { key: 'is_active', type: 'boolean', label: 'Активно' },
+          { key: 'sort_order', type: 'number', label: 'Порядок' }
+        ]
+      },
+      ui_texts: { 
+        name: 'UI Тексты', 
+        icon: '📝', 
+        table: 'ui_texts',
+        fields: [
+          { key: 'key', type: 'text', required: true, label: 'Ключ (ui.title, intro.p1)' },
+          { key: 'category', type: 'text', label: 'Категория' },
+          { key: 'value', type: 'jsonb', label: 'Значение' }
+        ]
+      },
+      political_systems: { 
+        name: 'Полит. системы', 
+        icon: '🏛️', 
+        table: 'political_systems',
+        fields: [
+          { key: 'id', type: 'text', required: true, label: 'ID' },
+          { key: 'icon', type: 'text', label: 'Иконка' },
+          { key: 'name', type: 'jsonb', label: 'Название' },
+          { key: 'leader', type: 'jsonb', label: 'Лидер' },
+          { key: 'description', type: 'jsonb', label: 'Описание' },
+          { key: 'pros', type: 'jsonb', label: 'Плюсы' },
+          { key: 'cons', type: 'jsonb', label: 'Минусы' },
+          { key: 'traits', type: 'json', label: 'Traits (JSON)' },
+          { key: 'is_premium', type: 'boolean', label: 'Premium' },
+          { key: 'is_active', type: 'boolean', label: 'Активно' },
+          { key: 'sort_order', type: 'number', label: 'Порядок' }
+        ]
+      },
+      planets: { 
+        name: 'Планеты', 
+        icon: '🌍', 
+        table: 'planets',
+        fields: [
+          { key: 'id', type: 'text', required: true, label: 'ID' },
+          { key: 'icon', type: 'text', label: 'Иконка' },
+          { key: 'name', type: 'jsonb', label: 'Название' },
+          { key: 'description', type: 'jsonb', label: 'Описание' },
+          { key: 'traits', type: 'jsonb', label: 'Черты' },
+          { key: 'quote', type: 'jsonb', label: 'Цитата' },
+          { key: 'difficulty', type: 'number', label: 'Сложность (1-5)' },
+          { key: 'stats', type: 'json', label: 'Stats (JSON)' },
+          { key: 'mods', type: 'json', label: 'Mods (JSON)' },
+          { key: 'is_active', type: 'boolean', label: 'Активно' },
+          { key: 'sort_order', type: 'number', label: 'Порядок' }
+        ]
+      },
+      languages: { 
+        name: 'Языки', 
+        icon: '🌐', 
+        table: 'languages',
+        fields: [
+          { key: 'code', type: 'text', required: true, label: 'Код (ru, en, de)' },
+          { key: 'name', type: 'text', label: 'Название (English)' },
+          { key: 'native_name', type: 'text', label: 'На родном (Русский)' },
+          { key: 'flag', type: 'text', label: 'Флаг (emoji)' },
+          { key: 'is_active', type: 'boolean', label: 'Активно' },
+          { key: 'sort_order', type: 'number', label: 'Порядок' }
+        ]
+      }
+    };
+
+    // ===== AUTH =====
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        state.loading = false;
+        render();
+        return;
+      }
+      
+      state.user = session.user;
+      const { data: profile } = await supabase.from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (!profile?.is_admin) {
+        state.loading = false;
+        state.error = 'Доступ запрещён. Нужны права администратора.';
+        render();
+        return;
+      }
+      
+      state.profile = profile;
+      state.loading = false;
+      await loadData(state.activeTab);
+      render();
+    }
+
+    async function signIn(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await checkAuth();
+    }
+
+    async function signOut() {
+      await supabase.auth.signOut();
+      state.user = null;
+      state.profile = null;
+      render();
+    }
+
+    // ===== DATA =====
+    async function loadData(tab) {
+      const config = TABLES[tab];
+      if (!config) return;
+      
+      const { data, error } = await supabase
+        .from(config.table)
+        .select('*')
+        .order('sort_order', { ascending: true, nullsFirst: false });
+      
+      if (error) {
+        console.error('Load error:', error);
+        return;
+      }
+      
+      state.data[tab] = data || [];
+      render();
+    }
+
+    async function saveItem(tab, item) {
+      const config = TABLES[tab];
+      const isNew = !item._original;
+      
+      // Remove internal fields
+      const toSave = { ...item };
+      delete toSave._original;
+      delete toSave._expanded;
+      
+      let result;
+      if (isNew) {
+        result = await supabase.from(config.table).insert(toSave);
+      } else {
+        const primaryKey = config.fields.find(f => f.required)?.key || 'id';
+        result = await supabase.from(config.table)
+          .update(toSave)
+          .eq(primaryKey, item._original[primaryKey]);
+      }
+      
+      if (result.error) {
+        alert('Ошибка сохранения: ' + result.error.message);
+        return false;
+      }
+      
+      await loadData(tab);
+      state.editing = null;
+      render();
+      return true;
+    }
+
+    async function deleteItem(tab, item) {
+      if (!confirm('Удалить эту запись?')) return;
+      
+      const config = TABLES[tab];
+      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
+      
+      const { error } = await supabase
+        .from(config.table)
+        .delete()
+        .eq(primaryKey, item[primaryKey]);
+      
+      if (error) {
+        alert('Ошибка удаления: ' + error.message);
+        return;
+      }
+      
+      await loadData(tab);
+      render();
+    }
+
+    // ===== RENDER =====
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (state.loading) {
+        app.innerHTML = `
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+              <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p class="text-amber-300">Загрузка...</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (state.error) {
+        app.innerHTML = `
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+              <p class="text-red-400 text-xl mb-4">⛔ ${state.error}</p>
+              <button onclick="location.reload()" class="px-4 py-2 bg-slate-700 rounded hover:bg-slate-600">Обновить</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (!state.user) {
+        app.innerHTML = renderLogin();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="flex h-screen">
+          ${renderSidebar()}
+          <div class="flex-1 overflow-auto">
+            ${renderHeader()}
+            ${renderContent()}
+          </div>
+        </div>
+        ${state.editing ? renderEditModal() : ''}
+      `;
+      
+      attachEventListeners();
+    }
+
+    function renderLogin() {
+      return `
+        <div class="flex items-center justify-center min-h-screen">
+          <div class="bg-slate-800 p-8 rounded-xl max-w-md w-full mx-4">
+            <h1 class="text-2xl font-bold text-amber-400 mb-6 text-center">🔐 Independence Admin</h1>
+            <form id="loginForm" class="space-y-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Email</label>
+                <input type="email" id="email" required 
+                  class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Пароль</label>
+                <input type="password" id="password" required 
+                  class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none">
+              </div>
+              <button type="submit" 
+                class="w-full py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
+                Войти
+              </button>
+            </form>
+            <p class="text-center text-gray-500 text-sm mt-4">Только для администраторов</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSidebar() {
+      return `
+        <div class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+          <div class="p-4 border-b border-slate-700">
+            <h1 class="text-xl font-bold text-amber-400">⚙️ Admin Panel</h1>
+            <p class="text-sm text-gray-400">Independence Game</p>
+          </div>
+          <nav class="flex-1 p-2">
+            ${Object.entries(TABLES).map(([key, config]) => `
+              <button onclick="switchTab('${key}')" 
+                class="w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === key ? 'bg-amber-600/20 text-amber-400' : 'hover:bg-slate-700 text-gray-300'}">
+                <span class="text-xl">${config.icon}</span>
+                <span>${config.name}</span>
+                <span class="ml-auto text-xs bg-slate-600 px-2 py-0.5 rounded">${state.data[key]?.length || 0}</span>
+              </button>
+            `).join('')}
+          </nav>
+          <div class="p-4 border-t border-slate-700">
+            <p class="text-sm text-gray-400 mb-2">👤 ${state.profile?.display_name || state.user?.email}</p>
+            <button onclick="handleSignOut()" class="text-sm text-red-400 hover:text-red-300">Выйти</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const config = TABLES[state.activeTab];
+      return `
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+          <div>
+            <h2 class="text-2xl font-bold">${config.icon} ${config.name}</h2>
+            <p class="text-gray-400 text-sm">Таблица: ${config.table}</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="handleRefresh()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
+              🔄 Обновить
+            </button>
+            <button onclick="handleAdd()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
+              ➕ Добавить
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderContent() {
+      const config = TABLES[state.activeTab];
+      const items = state.data[state.activeTab] || [];
+      
+      if (items.length === 0) {
+        return `
+          <div class="p-8 text-center text-gray-400">
+            <p class="text-4xl mb-4">📭</p>
+            <p>Нет записей</p>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6">
+          <div class="space-y-2">
+            ${items.map(item => renderItem(config, item)).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderItem(config, item) {
+      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
+      const titleField = config.fields.find(f => f.type === 'jsonb')?.key;
+      const title = titleField && item[titleField] ? (item[titleField].ru || item[titleField].en || JSON.stringify(item[titleField])) : item[primaryKey];
+      
+      return `
+        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-slate-600">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              ${item.icon ? `<span class="text-2xl">${item.icon}</span>` : ''}
+              <div>
+                <p class="font-bold text-amber-200">${escapeHtml(String(title).substring(0, 60))}</p>
+                <p class="text-sm text-gray-500">${item[primaryKey]}${item.system ? ` • ${item.system}` : ''}${item.is_active === false ? ' • <span class="text-red-400">неактивно</span>' : ''}</p>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="handleEdit('${item[primaryKey]}')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">
+                ✏️ Редактировать
+              </button>
+              <button onclick="handleDelete('${item[primaryKey]}')" class="px-3 py-1 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded text-sm">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderEditModal() {
+      const config = TABLES[state.activeTab];
+      const item = state.editing;
+      const isNew = !item._original;
+      
+      return `
+        <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onclick="handleCloseModal(event)">
+          <div class="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+              <h3 class="text-lg font-bold text-amber-400">${isNew ? '➕ Новая запись' : '✏️ Редактирование'}</h3>
+              <button onclick="handleCloseModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <form id="editForm" class="space-y-4">
+                ${config.fields.map(field => renderField(field, item)).join('')}
+              </form>
+            </div>
+            <div class="p-4 border-t border-slate-700 flex justify-end gap-2">
+              <button onclick="handleCloseModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
+                Отмена
+              </button>
+              <button onclick="handleSave()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
+                💾 Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderField(field, item) {
+      const value = item[field.key];
+      
+      switch (field.type) {
+        case 'jsonb':
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+              <div class="space-y-2">
+                ${state.languages.map(lang => `
+                  <div class="flex gap-2 items-center">
+                    <span class="lang-badge lang-${lang}">${lang.toUpperCase()}</span>
+                    <input type="text" data-field="${field.key}" data-lang="${lang}" 
+                      value="${escapeHtml(value?.[lang] || '')}"
+                      class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        
+        case 'choices':
+          const choices = value || [];
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+              <div id="choices-container" class="space-y-3">
+                ${choices.map((choice, i) => renderChoice(choice, i)).join('')}
+              </div>
+              <button type="button" onclick="addChoice()" class="mt-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">
+                ➕ Добавить вариант
+              </button>
+            </div>
+          `;
+        
+        case 'json':
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+              <textarea data-field="${field.key}" data-type="json" rows="4"
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded font-mono text-sm focus:border-amber-500 focus:outline-none">${escapeHtml(JSON.stringify(value || {}, null, 2))}</textarea>
+            </div>
+          `;
+        
+        case 'boolean':
+          return `
+            <div class="flex items-center gap-2">
+              <input type="checkbox" data-field="${field.key}" ${value ? 'checked' : ''} 
+                class="w-5 h-5 rounded bg-slate-700 border-slate-600 text-amber-500 focus:ring-amber-500">
+              <label class="text-gray-300">${field.label}</label>
+            </div>
+          `;
+        
+        case 'select':
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+              <select data-field="${field.key}" 
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
+                ${field.options.map(opt => `
+                  <option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>
+                `).join('')}
+              </select>
+            </div>
+          `;
+        
+        case 'number':
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+              <input type="number" data-field="${field.key}" value="${value || 0}"
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
+            </div>
+          `;
+        
+        default:
+          return `
+            <div>
+              <label class="block text-sm text-gray-400 mb-1">${field.label}${field.required ? ' *' : ''}</label>
+              <input type="text" data-field="${field.key}" value="${escapeHtml(value || '')}"
+                ${field.required ? 'required' : ''}
+                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
+            </div>
+          `;
+      }
+    }
+
+    function renderChoice(choice, index) {
+      return `
+        <div class="bg-slate-700/50 rounded-lg p-3 border border-slate-600" data-choice-index="${index}">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-bold text-amber-300">Вариант ${index + 1}</span>
+            <button type="button" onclick="removeChoice(${index})" class="text-red-400 hover:text-red-300 text-sm">🗑️</button>
+          </div>
+          <div class="space-y-2">
+            <div class="text-xs text-gray-400 mb-1">Текст:</div>
+            ${state.languages.map(lang => `
+              <div class="flex gap-2 items-center">
+                <span class="lang-badge lang-${lang}">${lang.toUpperCase()}</span>
+                <input type="text" data-choice="${index}" data-choice-field="text" data-lang="${lang}"
+                  value="${escapeHtml(choice.text?.[lang] || '')}"
+                  class="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+            `).join('')}
+            <div class="grid grid-cols-3 gap-2 mt-2">
+              <div>
+                <label class="text-xs text-gray-400">😊 Счастье</label>
+                <input type="number" data-choice="${index}" data-choice-field="effects.happiness" value="${choice.effects?.happiness || 0}"
+                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="text-xs text-gray-400">💰 Богатство</label>
+                <input type="number" data-choice="${index}" data-choice-field="effects.wealth" value="${choice.effects?.wealth || 0}"
+                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="text-xs text-gray-400">⚖️ Стабильность</label>
+                <input type="number" data-choice="${index}" data-choice-field="effects.stability" value="${choice.effects?.stability || 0}"
+                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-xs text-gray-400">💵 Стоимость</label>
+                <input type="number" data-choice="${index}" data-choice-field="cost" value="${choice.cost || 0}"
+                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="text-xs text-gray-400">🪙 Hydrobite</label>
+                <input type="number" data-choice="${index}" data-choice-field="hydro" value="${choice.hydro || 0}"
+                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ===== EVENT HANDLERS =====
+    function attachEventListeners() {
+      const loginForm = document.getElementById('loginForm');
+      if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const email = document.getElementById('email').value;
+          const password = document.getElementById('password').value;
+          try {
+            await signIn(email, password);
+          } catch (err) {
+            alert('Ошибка входа: ' + err.message);
+          }
+        });
+      }
+    }
+
+    window.switchTab = async function(tab) {
+      state.activeTab = tab;
+      if (!state.data[tab]) {
+        await loadData(tab);
+      }
+      render();
+    };
+
+    window.handleRefresh = async function() {
+      await loadData(state.activeTab);
+    };
+
+    window.handleAdd = function() {
+      const config = TABLES[state.activeTab];
+      const newItem = {};
+      config.fields.forEach(f => {
+        if (f.type === 'jsonb') newItem[f.key] = { ru: '', en: '', de: '' };
+        else if (f.type === 'choices') newItem[f.key] = [];
+        else if (f.type === 'json') newItem[f.key] = {};
+        else if (f.type === 'boolean') newItem[f.key] = true;
+        else if (f.type === 'number') newItem[f.key] = 0;
+        else newItem[f.key] = '';
+      });
+      state.editing = newItem;
+      render();
+    };
+
+    window.handleEdit = function(id) {
+      const items = state.data[state.activeTab] || [];
+      const config = TABLES[state.activeTab];
+      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
+      const item = items.find(i => i[primaryKey] === id);
+      if (item) {
+        state.editing = { ...item, _original: item };
+        render();
+      }
+    };
+
+    window.handleDelete = async function(id) {
+      const items = state.data[state.activeTab] || [];
+      const config = TABLES[state.activeTab];
+      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
+      const item = items.find(i => i[primaryKey] === id);
+      if (item) {
+        await deleteItem(state.activeTab, item);
+      }
+    };
+
+    window.handleCloseModal = function(event) {
+      if (!event || event.target === event.currentTarget) {
+        state.editing = null;
+        render();
+      }
+    };
+
+    window.handleSave = async function() {
+      const config = TABLES[state.activeTab];
+      const form = document.getElementById('editForm');
+      const item = { ...state.editing };
+      
+      // Collect form data
+      form.querySelectorAll('[data-field]').forEach(input => {
+        const field = input.dataset.field;
+        const lang = input.dataset.lang;
+        const type = input.dataset.type;
+        
+        if (lang) {
+          if (!item[field]) item[field] = {};
+          item[field][lang] = input.value;
+        } else if (type === 'json') {
+          try {
+            item[field] = JSON.parse(input.value);
+          } catch (e) {
+            alert('Неверный JSON в поле ' + field);
+            return;
+          }
+        } else if (input.type === 'checkbox') {
+          item[field] = input.checked;
+        } else if (input.type === 'number') {
+          item[field] = parseInt(input.value) || 0;
+        } else {
+          item[field] = input.value;
+        }
+      });
+      
+      // Collect choices
+      const choicesContainer = document.getElementById('choices-container');
+      if (choicesContainer) {
+        const choices = [];
+        choicesContainer.querySelectorAll('[data-choice-index]').forEach(choiceEl => {
+          const choice = { text: {}, effects: {} };
+          choiceEl.querySelectorAll('[data-choice]').forEach(input => {
+            const choiceField = input.dataset.choiceField;
+            const lang = input.dataset.lang;
+            
+            if (choiceField === 'text' && lang) {
+              choice.text[lang] = input.value;
+            } else if (choiceField.startsWith('effects.')) {
+              const effectKey = choiceField.split('.')[1];
+              choice.effects[effectKey] = parseInt(input.value) || 0;
+            } else if (choiceField === 'cost') {
+              choice.cost = parseInt(input.value) || 0;
+            } else if (choiceField === 'hydro') {
+              choice.hydro = parseInt(input.value) || 0;
+            }
+          });
+          choices.push(choice);
+        });
+        item.choices = choices;
+      }
+      
+      await saveItem(state.activeTab, item);
+    };
+
+    window.addChoice = function() {
+      const container = document.getElementById('choices-container');
+      const index = container.children.length;
+      const choice = { text: { ru: '', en: '', de: '' }, effects: {}, cost: 0, hydro: 0 };
+      container.insertAdjacentHTML('beforeend', renderChoice(choice, index));
+    };
+
+    window.removeChoice = function(index) {
+      const container = document.getElementById('choices-container');
+      const el = container.querySelector(`[data-choice-index="${index}"]`);
+      if (el) el.remove();
+      // Re-index remaining choices
+      container.querySelectorAll('[data-choice-index]').forEach((el, i) => {
+        el.dataset.choiceIndex = i;
+        el.querySelector('span').textContent = `Вариант ${i + 1}`;
+      });
+    };
+
+    window.handleSignOut = async function() {
+      await signOut();
+    };
+
+    // ===== UTILS =====
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ===== INIT =====
+    checkAuth();
+  </script>
+</body>
+</html>
