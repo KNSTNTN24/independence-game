@@ -432,15 +432,17 @@
       const endGame=useCallback(async(isVictory,vType=null)=>{
         const score=calculateScore(stats,turn,isVictory);
         setFinalScore(score);setVictoryType(vType);
+        setPhase(isVictory?'victory':'gameover'); // Set phase first!
         if(user){
-          const gameData={planet:T.planets[planetId]?.name?.[lang]||planetId,system,difficulty,maxTurns,turn,stats,hydrobite,isVictory,victoryType:vType,score,duration:0};
+          const planetName=T?.planets?.[planetId]?.name?.[lang]||planetId;
+          const gameData={planet:planetName,system,difficulty,maxTurns,turn,stats,hydrobite:hydrobite||0,isVictory,victoryType:vType,score,duration:0};
           try{
-            await db.saveGameResult(user.id,gameData);
+            const result=await db.saveGameResult(user.id,gameData);
+            if(result.error)console.error('DB save error:',result.error);
             if(refreshProfile)await refreshProfile();
           }catch(e){console.error('Save error:',e);}
         }
-        setPhase(isVictory?'victory':'gameover');
-      },[user,planetId,system,difficulty,maxTurns,turn,stats,hydrobite,lang,calculateScore,refreshProfile]);
+      },[user,planetId,system,difficulty,maxTurns,turn,stats,hydrobite,lang,calculateScore,refreshProfile,T]);
 
       const startGame=useCallback(()=>{
         if(!isPremium&&SYSTEMS[system].premium){showToast('🔒 Premium required!','warning');return;}
