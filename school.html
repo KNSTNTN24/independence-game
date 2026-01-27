@@ -197,19 +197,26 @@
       const lang='en';
 
       // Scenario settings
-      const allowedSystems=scenario?.allowed_systems||Object.keys(SYSTEMS);
       const maxTurns=scenario?.max_turns||12;
       const targetHappiness=scenario?.target_happiness||60;
       const targetWealth=scenario?.target_wealth||60;
       const targetStability=scenario?.target_stability||60;
       const reflectionQuestions=scenario?.reflection_questions||[];
 
-      // Filter systems based on scenario
+      // Filter systems based on scenario - recalculate when SYSTEMS or scenario changes
       const availableSystems=useMemo(()=>{
+        // If no scenario (Free Play) or no allowed_systems specified, show all
+        if(!scenario || !scenario.allowed_systems || !scenario.allowed_systems.length){
+          return SYSTEMS;
+        }
+        // Filter to only allowed systems
         const filtered={};
-        allowedSystems.forEach(id=>{if(SYSTEMS[id])filtered[id]=SYSTEMS[id];});
-        return Object.keys(filtered).length?filtered:SYSTEMS;
-      },[allowedSystems,SYSTEMS]);
+        scenario.allowed_systems.forEach(id=>{
+          if(SYSTEMS[id])filtered[id]=SYSTEMS[id];
+        });
+        // If filtering resulted in empty (bad data), return all systems
+        return Object.keys(filtered).length>0?filtered:SYSTEMS;
+      },[scenario,SYSTEMS]);
 
       // Game state
       const[phase,setPhase]=useState('lobby');
@@ -217,7 +224,7 @@
       const[stats,setStats]=useState({happiness:60,wealth:50,stability:70});
       const[hydrobite,setHydrobite]=useState(100);
       const[budget,setBudget]=useState({defence:20,education:20,health:20,infra:20,welfare:20});
-      const[system,setSystem]=useState(Object.keys(availableSystems)[0]||'parliamentary');
+      const[system,setSystem]=useState('parliamentary');
       const[planetId,setPlanetId]=useState('terranova');
       const[event,setEvent]=useState(null);
       const[usedEvents,setUsedEvents]=useState([]);
@@ -225,6 +232,14 @@
       const[decisionsLog,setDecisionsLog]=useState([]);
       const[reflectionAnswers,setReflectionAnswers]=useState({});
       const[classLeaderboard,setClassLeaderboard]=useState([]);
+
+      // Update selected system if not in available systems
+      useEffect(()=>{
+        const available=Object.keys(availableSystems);
+        if(available.length>0 && !availableSystems[system]){
+          setSystem(available[0]);
+        }
+      },[availableSystems]);
 
       const sys=SYSTEMS[system]||Object.values(SYSTEMS)[0];
       const planet=PLANETS[planetId]||Object.values(PLANETS)[0];
