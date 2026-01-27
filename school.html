@@ -316,7 +316,15 @@
       };
 
       const handleChoice=(choice)=>{
-        setDecisionsLog(prev=>[...prev,{turn,event:event?.id,choice:choice.text?.en}]);
+        // Enhanced decision log with event details
+        setDecisionsLog(prev=>[...prev,{
+          turn,
+          eventId:event?.id,
+          eventTitle:event?.title?.en||'Event',
+          eventIcon:event?.icon||'❓',
+          choice:choice.text?.en,
+          effects:choice.effects||{}
+        }]);
         const effects=choice.effects||{};
         const newStats={
           happiness:Math.min(100,Math.max(0,(stats.happiness||60)+(effects.happiness||0))),
@@ -328,6 +336,56 @@
         const newTurn=turn+1;
         if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setEvent(null);setPhase('playing');}
       };
+
+      // Generate narrative summary of the game
+      const generateSummary=useCallback(()=>{
+        const sysName=SYSTEMS[system]?.name?.en||system;
+        const planetName=PLANETS[planetId]?.name?.en||planetId;
+        const isVictory=phase==='victory';
+        
+        let summary=`Your ${sysName} on ${planetName} `;
+        
+        if(isVictory){
+          summary+=`successfully governed for ${turn} years. `;
+        }else{
+          const failReason=stats.happiness<=0?'citizen unhappiness':stats.wealth<=0?'economic collapse':'political instability';
+          summary+=`collapsed after ${turn} years due to ${failReason}. `;
+        }
+        
+        // Analyze budget priorities
+        const avgBudget={...budget};
+        const topPriority=Object.entries(avgBudget).sort((a,b)=>b[1]-a[1])[0];
+        const budgetLabels={defence:'military and defence',education:'education',health:'healthcare',infra:'infrastructure',welfare:'social welfare'};
+        summary+=`Your government prioritized ${budgetLabels[topPriority[0]]||topPriority[0]} spending. `;
+        
+        // Key events narrative
+        if(decisionsLog.length>0){
+          summary+='\n\nKey moments:\n';
+          decisionsLog.slice(0,5).forEach((d,i)=>{
+            const effectText=Object.entries(d.effects||{}).map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(', ');
+            summary+=`• Year ${d.turn}: ${d.eventIcon} ${d.eventTitle} — You chose: "${d.choice}"${effectText?' ('+effectText+')':''}\n`;
+          });
+          if(decisionsLog.length>5){
+            summary+=`...and ${decisionsLog.length-5} more decisions.\n`;
+          }
+        }
+        
+        // Final assessment
+        summary+='\n';
+        if(isVictory){
+          if(stats.happiness>=80&&stats.wealth>=80&&stats.stability>=80){
+            summary+='🌟 Outstanding! You achieved near-perfect balance across all metrics.';
+          }else if(stats.happiness>=targetHappiness&&stats.wealth>=targetWealth&&stats.stability>=targetStability){
+            summary+='✅ Well done! You met all target goals for your colony.';
+          }else{
+            summary+='⚠️ You survived, but there is room for improvement.';
+          }
+        }else{
+          summary+='💡 Consider: What budget changes or different decisions might have prevented this outcome?';
+        }
+        
+        return summary;
+      },[system,planetId,turn,stats,budget,decisionsLog,phase,SYSTEMS,PLANETS,targetHappiness,targetWealth,targetStability]);
 
       const submitReflection=async()=>{
         if(student&&session){
@@ -363,7 +421,20 @@
 
             <div className="text-center mb-4">
               <h1 className="text-3xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
+              <p className="text-gray-400 text-sm">Lead a colony to prosperity through your political decisions</p>
             </div>
+
+            {/* How to Play */}
+            <details className="bg-slate-800/30 border border-slate-700 rounded-xl p-4 mb-4">
+              <summary className="text-blue-300 font-bold cursor-pointer">📖 How to Play</summary>
+              <div className="mt-3 text-sm text-gray-400 space-y-2">
+                <p><strong className="text-white">🎯 Goal:</strong> Keep your colony stable for {maxTurns} years while maintaining Happiness, Wealth, and Stability above the target levels.</p>
+                <p><strong className="text-white">🏛️ Political System:</strong> Each system has unique traits. Democracies are stable but slow; dictatorships are efficient but risky.</p>
+                <p><strong className="text-white">💰 Budget:</strong> Allocate resources each year. Welfare & Health → Happiness. Infrastructure & Education → Wealth. Defence → Stability.</p>
+                <p><strong className="text-white">⚡ Events:</strong> Random crises will test your leadership. Your choices have consequences!</p>
+                <p><strong className="text-white">💀 Defeat:</strong> If any stat drops to 0%, your government collapses.</p>
+              </div>
+            </details>
 
             {/* System Selection */}
             <div className="mb-4">
@@ -372,18 +443,36 @@
                 {Object.entries(availableSystems).map(([id,s])=><button key={id} onClick={()=>setSystem(id)} className={`p-3 rounded-lg border text-left transition ${system===id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
                   <span className="text-2xl">{s.icon}</span>
                   <p className="text-sm text-white mt-1">{s.name?.[lang]||id}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.traits?.stabilityBonus>0?'Stable':'Flexible'} • {s.is_premium?'Advanced':'Basic'}</p>
                 </button>)}
               </div>
+              {/* Selected system description */}
+              {availableSystems[system]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <p className="text-sm text-gray-300">{T.systems[system]?.desc?.[lang]||availableSystems[system]?.description?.[lang]||'Choose your political system wisely. Each has unique strengths and challenges.'}</p>
+              </div>}
             </div>
 
             {/* Planet Selection */}
             <div className="mb-4">
               <label className="text-sm text-gray-400 block mb-2">🌍 Planet</label>
               <div className="grid grid-cols-5 gap-2">
-                {Object.entries(PLANETS).map(([id,p])=><button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`}>
+                {Object.entries(PLANETS).map(([id,p])=><button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={p.name?.[lang]||id}>
                   <span className="text-2xl">{p.icon}</span>
                 </button>)}
               </div>
+              {/* Selected planet description */}
+              {PLANETS[planetId]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-white font-bold">{T.planets[planetId]?.name?.[lang]||PLANETS[planetId]?.name?.[lang]||planetId}</span>
+                  <span className="text-xs text-gray-500">Difficulty: {'⭐'.repeat(PLANETS[planetId]?.difficulty||1)}</span>
+                </div>
+                <p className="text-xs text-gray-400">{T.planets[planetId]?.desc?.[lang]||PLANETS[planetId]?.description?.[lang]||'A new world awaits your leadership.'}</p>
+                <div className="flex gap-2 mt-2 text-xs">
+                  <span className="text-green-400">😊{PLANETS[planetId]?.stats?.happiness||60}%</span>
+                  <span className="text-yellow-400">💰{PLANETS[planetId]?.stats?.wealth||50}%</span>
+                  <span className="text-blue-400">⚖️{PLANETS[planetId]?.stats?.stability||70}%</span>
+                </div>
+              </div>}
             </div>
 
             <button onClick={startGame} disabled={!session} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
@@ -446,16 +535,26 @@
 
             {/* Budget */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
-              <div className="flex justify-between mb-3">
+              <div className="flex justify-between mb-2">
                 <span className="text-gray-400">Budget <span className={`font-bold ${Object.values(budget).reduce((a,b)=>a+b,0)>100?'text-red-400':'text-white'}`}>({Object.values(budget).reduce((a,b)=>a+b,0)}%/100%)</span></span>
                 <span className="text-blue-400 font-bold">💎 {Math.round(hydrobite)}</span>
               </div>
-              {['defence','education','health','infra','welfare'].map(s=>{
-                const others=Object.entries(budget).filter(([k])=>k!==s).reduce((sum,[,v])=>sum+(v||0),0);
+              <p className="text-xs text-gray-500 mb-3">Allocate your resources wisely. Higher spending costs more Hydrobite.</p>
+              {[
+                {id:'defence',icon:'🛡️',hint:'→ ⚖️ Stability'},
+                {id:'education',icon:'📚',hint:'→ 💰 Wealth'},
+                {id:'health',icon:'🏥',hint:'→ 😊 Happiness'},
+                {id:'infra',icon:'🏗️',hint:'→ 💰 Wealth'},
+                {id:'welfare',icon:'🤝',hint:'→ 😊 Happiness'}
+              ].map(({id,icon,hint})=>{
+                const others=Object.entries(budget).filter(([k])=>k!==id).reduce((sum,[,v])=>sum+(v||0),0);
                 const maxForThis=Math.min(50,100-others);
-                return<div key={s} className="mb-2">
-                <div className="flex justify-between text-xs mb-1"><span className="capitalize">{s}</span><span>{budget[s]}%</span></div>
-                <input type="range" min="0" max={maxForThis} value={Math.min(budget[s],maxForThis)} onChange={e=>setBudget(prev=>({...prev,[s]:Math.min(parseInt(e.target.value)||0,maxForThis)}))} className="w-full bg-slate-700"/>
+                return<div key={id} className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span>{icon} <span className="capitalize">{id}</span> <span className="text-gray-600">{hint}</span></span>
+                  <span>{budget[id]}%</span>
+                </div>
+                <input type="range" min="0" max={maxForThis} value={Math.min(budget[id],maxForThis)} onChange={e=>setBudget(prev=>({...prev,[id]:Math.min(parseInt(e.target.value)||0,maxForThis)}))} className="w-full bg-slate-700"/>
               </div>})}
             </div>
 
@@ -495,22 +594,42 @@
       // VICTORY / GAMEOVER
       if(phase==='victory'||phase==='gameover'){
         const isVictory=phase==='victory';
+        const summary=generateSummary();
         return<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
-          <div className="max-w-md w-full text-center relative z-10 animate-slideUp">
-            <div className={`bg-gradient-to-b ${isVictory?'from-blue-900/50':'from-red-900/50'} to-slate-800 rounded-2xl border ${isVictory?'border-blue-500/50':'border-red-500/50'} p-8`}>
-              <span className="text-6xl block mb-4">{isVictory?'🏆':'💀'}</span>
-              <h1 className={`text-3xl font-display font-bold ${isVictory?'gold-gradient':'text-red-400'} mb-4`}>{isVictory?'Victory!':'Defeat'}</h1>
-              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-                <div className="text-4xl font-bold text-blue-400 mb-2">{finalScore}</div>
-                <p className="text-gray-400">Score</p>
+          <div className="max-w-md w-full relative z-10 animate-slideUp">
+            <div className={`bg-gradient-to-b ${isVictory?'from-blue-900/50':'from-red-900/50'} to-slate-800 rounded-2xl border ${isVictory?'border-blue-500/50':'border-red-500/50'} p-6`}>
+              <div className="text-center">
+                <span className="text-5xl block mb-2">{isVictory?'🏆':'💀'}</span>
+                <h1 className={`text-2xl font-display font-bold ${isVictory?'gold-gradient':'text-red-400'} mb-2`}>{isVictory?'Victory!':'Defeat'}</h1>
+                <div className="inline-block bg-slate-800/50 rounded-xl px-6 py-3 mb-4">
+                  <div className="text-3xl font-bold text-blue-400">{finalScore}</div>
+                  <p className="text-gray-400 text-sm">Score</p>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div className="text-center"><span className="text-2xl">😊</span><p className={`font-bold ${stats.happiness>=targetHappiness?'text-green-400':'text-red-400'}`}>{Math.round(stats.happiness)}%</p></div>
-                <div className="text-center"><span className="text-2xl">💰</span><p className={`font-bold ${stats.wealth>=targetWealth?'text-green-400':'text-red-400'}`}>{Math.round(stats.wealth)}%</p></div>
-                <div className="text-center"><span className="text-2xl">⚖️</span><p className={`font-bold ${stats.stability>=targetStability?'text-green-400':'text-red-400'}`}>{Math.round(stats.stability)}%</p></div>
+              
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="text-center bg-slate-800/30 rounded-lg p-2">
+                  <span className="text-xl">😊</span>
+                  <p className={`font-bold text-sm ${stats.happiness>=targetHappiness?'text-green-400':'text-red-400'}`}>{Math.round(stats.happiness)}%</p>
+                </div>
+                <div className="text-center bg-slate-800/30 rounded-lg p-2">
+                  <span className="text-xl">💰</span>
+                  <p className={`font-bold text-sm ${stats.wealth>=targetWealth?'text-green-400':'text-red-400'}`}>{Math.round(stats.wealth)}%</p>
+                </div>
+                <div className="text-center bg-slate-800/30 rounded-lg p-2">
+                  <span className="text-xl">⚖️</span>
+                  <p className={`font-bold text-sm ${stats.stability>=targetStability?'text-green-400':'text-red-400'}`}>{Math.round(stats.stability)}%</p>
+                </div>
               </div>
-              <button onClick={()=>setPhase('reflection')} className={`w-full py-4 bg-gradient-to-r ${isVictory?'from-blue-600 to-blue-500':'from-red-600 to-red-500'} text-white rounded-xl font-bold`}>
-                Reflection →
+
+              {/* Summary */}
+              <div className="bg-slate-900/50 rounded-xl p-4 mb-4 max-h-48 overflow-y-auto">
+                <h3 className="text-blue-300 font-bold text-sm mb-2">📜 Your Story</h3>
+                <p className="text-gray-300 text-sm whitespace-pre-line">{summary}</p>
+              </div>
+              
+              <button onClick={()=>setPhase('reflection')} className={`w-full py-3 bg-gradient-to-r ${isVictory?'from-blue-600 to-blue-500':'from-red-600 to-red-500'} text-white rounded-xl font-bold`}>
+                📝 Reflection →
               </button>
             </div>
           </div>
