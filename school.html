@@ -432,17 +432,20 @@
             {/* Budget */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
               <div className="flex justify-between mb-3">
-                <span className="text-gray-400">Budget</span>
+                <span className="text-gray-400">Budget <span className={`font-bold ${Object.values(budget).reduce((a,b)=>a+b,0)>100?'text-red-400':'text-white'}`}>({Object.values(budget).reduce((a,b)=>a+b,0)}%/100%)</span></span>
                 <span className="text-blue-400 font-bold">💎 {Math.round(hydrobite)}</span>
               </div>
-              {['defence','education','health','infra','welfare'].map(s=><div key={s} className="mb-2">
+              {['defence','education','health','infra','welfare'].map(s=>{
+                const others=Object.entries(budget).filter(([k])=>k!==s).reduce((sum,[,v])=>sum+(v||0),0);
+                const maxForThis=Math.min(50,100-others);
+                return<div key={s} className="mb-2">
                 <div className="flex justify-between text-xs mb-1"><span className="capitalize">{s}</span><span>{budget[s]}%</span></div>
-                <input type="range" min="0" max="50" value={budget[s]} onChange={e=>setBudget(prev=>({...prev,[s]:parseInt(e.target.value)||0}))} className="w-full bg-slate-700"/>
-              </div>)}
+                <input type="range" min="0" max={maxForThis} value={Math.min(budget[s],maxForThis)} onChange={e=>setBudget(prev=>({...prev,[s]:Math.min(parseInt(e.target.value)||0,maxForThis)}))} className="w-full bg-slate-700"/>
+              </div>})}
             </div>
 
-            <button onClick={nextTurn} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold">
-              Next →
+            <button onClick={nextTurn} disabled={Object.values(budget).reduce((a,b)=>a+b,0)>100} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+              {Object.values(budget).reduce((a,b)=>a+b,0)>100?'Budget exceeds 100%':'Next →'}
             </button>
           </div>
         </div>;
