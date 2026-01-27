@@ -282,17 +282,21 @@
       };
 
       const applyBudgetEffects=()=>{
-        const mods=planet?.mods||{happiness:1,wealth:1,stability:1};
+        const hMod=planet?.mods?.happiness||1;
+        const wMod=planet?.mods?.wealth||1;
+        const sMod=planet?.mods?.stability||1;
+        const stabBonus=sys?.traits?.stabilityBonus||0;
         setStats(prev=>({
-          happiness:Math.min(100,Math.max(0,prev.happiness+(budget.welfare-15)*0.3*mods.happiness+(budget.health-15)*0.2*mods.happiness)),
-          wealth:Math.min(100,Math.max(0,prev.wealth+(budget.infra-15)*0.3*mods.wealth+(budget.education-10)*0.15*mods.wealth)),
-          stability:Math.min(100,Math.max(0,prev.stability+(budget.defence-15)*0.2*mods.stability+(sys.traits?.stabilityBonus||0)*0.1))
+          happiness:Math.min(100,Math.max(0,(prev.happiness||60)+(budget.welfare-15)*0.3*hMod+(budget.health-15)*0.2*hMod)),
+          wealth:Math.min(100,Math.max(0,(prev.wealth||50)+(budget.infra-15)*0.3*wMod+(budget.education-10)*0.15*wMod)),
+          stability:Math.min(100,Math.max(0,(prev.stability||70)+(budget.defence-15)*0.2*sMod+stabBonus*0.1))
         }));
       };
 
       const nextTurn=()=>{
         applyBudgetEffects();
-        setHydrobite(h=>Math.max(0,h+20-Object.values(budget).reduce((a,b)=>a+b,0)*0.3));
+        const totalBudget=Object.values(budget).reduce((a,b)=>a+(b||0),0);
+        setHydrobite(h=>Math.max(0,(h||100)+20-totalBudget*0.3));
         if(!triggerEvent()){const newTurn=turn+1;if(!checkGameEnd(stats,newTurn))setTurn(newTurn);}
       };
 
@@ -300,12 +304,12 @@
         setDecisionsLog(prev=>[...prev,{turn,event:event?.id,choice:choice.text?.en}]);
         const effects=choice.effects||{};
         const newStats={
-          happiness:Math.min(100,Math.max(0,stats.happiness+(effects.happiness||0))),
-          wealth:Math.min(100,Math.max(0,stats.wealth+(effects.wealth||0))),
-          stability:Math.min(100,Math.max(0,stats.stability+(effects.stability||0)))
+          happiness:Math.min(100,Math.max(0,(stats.happiness||60)+(effects.happiness||0))),
+          wealth:Math.min(100,Math.max(0,(stats.wealth||50)+(effects.wealth||0))),
+          stability:Math.min(100,Math.max(0,(stats.stability||70)+(effects.stability||0)))
         };
         setStats(newStats);
-        setHydrobite(h=>Math.max(0,h-(choice.cost||0)+(choice.hydro||0)));
+        setHydrobite(h=>Math.max(0,(h||100)-(choice.cost||0)+(choice.hydro||0)));
         const newTurn=turn+1;
         if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setEvent(null);setPhase('playing');}
       };
