@@ -35,15 +35,15 @@
     const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
     const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-    const CACHE_KEY='independence_school_v2';
+    const CACHE_KEY='independence_school_v3';
     const CACHE_TTL=1000*60*30;
 
     // Fallback
     const FALLBACK={
-      T:{ui:{},systems:{},planets:{}},
-      SYSTEMS:{parliamentary:{id:'parliamentary',icon:'🏛️',name:{en:'Parliamentary Democracy'},traits:{stabilityBonus:5}}},
-      PLANETS:{terranova:{id:'terranova',icon:'🌍',name:{en:'Terra Nova'},stats:{happiness:60,wealth:50,stability:70},mods:{happiness:1,wealth:1,stability:1}}},
-      EVENTS:[],LANGUAGES:[{code:'en',name:'English',flag:'🇬🇧'}]
+      T:{ui:{},school:{},systems:{},planets:{}},
+      SYSTEMS:{parliamentary:{id:'parliamentary',icon:'🏛️',name:{en:'Parliamentary Democracy',ru:'Парламентская демократия'},description:{en:'Citizens elect representatives.',ru:'Граждане выбирают представителей.'},traits:{stabilityBonus:5}}},
+      PLANETS:{terranova:{id:'terranova',icon:'🌍',name:{en:'Terra Nova',ru:'Терра Нова'},description:{en:'Earth-like planet.',ru:'Землеподобная планета.'},difficulty:1,stats:{happiness:60,wealth:50,stability:70},mods:{happiness:1,wealth:1,stability:1}}},
+      EVENTS:[],LANGUAGES:[{code:'en',name:'English',flag:'🇬🇧'},{code:'ru',name:'Русский',flag:'🇷🇺'}]
     };
 
     // Content loader
@@ -68,8 +68,16 @@
 
     const transform=(raw)=>{
       if(!raw)return null;
-      const T={ui:{},systems:{},planets:{}};
-      raw.ui_texts?.forEach(t=>{const[cat,key]=t.key.split('.');if(cat&&key){if(!T[cat])T[cat]={};T[cat][key]=t.value;}});
+      const T={ui:{},school:{},systems:{},planets:{}};
+      raw.ui_texts?.forEach(t=>{
+        const parts=t.key.split('.');
+        if(parts.length>=2){
+          const[cat,...rest]=parts;
+          const key=rest.join('.');
+          if(!T[cat])T[cat]={};
+          T[cat][key]=t.value;
+        }
+      });
       const SYSTEMS={};raw.systems?.forEach(s=>{SYSTEMS[s.id]={...s};T.systems[s.id]={name:s.name,leader:s.leader,desc:s.description};});
       const PLANETS={};raw.planets?.forEach(p=>{PLANETS[p.id]={...p};T.planets[p.id]={name:p.name,desc:p.description};});
       const EVENTS=raw.events?.map(e=>({id:e.id,icon:e.icon,system:e.system,title:e.title,desc:e.description,choices:e.choices||[]}))||[];
@@ -80,11 +88,30 @@
     // Contexts
     const ContentContext=createContext(FALLBACK);
     const StudentContext=createContext(null);
+    const LangContext=createContext({lang:'en',setLang:()=>{},t:()=>''});
 
     function ContentProvider({children}){
       const[content,setContent]=useState(FALLBACK);
       useEffect(()=>{loadContent().then(c=>{if(c&&Object.keys(c.SYSTEMS).length)setContent(c);});},[]);
       return <ContentContext.Provider value={content}>{children}</ContentContext.Provider>;
+    }
+
+    function LangProvider({children}){
+      const[lang,setLang]=useState(()=>localStorage.getItem('school_lang')||'en');
+      const content=useContext(ContentContext);
+      
+      // Translation function
+      const t=useCallback((key,fallback='')=>{
+        const val=content?.T?.school?.[key];
+        if(val&&typeof val==='object'){
+          return val[lang]||val.en||val.ru||fallback||key;
+        }
+        return fallback||key;
+      },[lang,content]);
+
+      const changeLang=(l)=>{setLang(l);localStorage.setItem('school_lang',l);};
+      
+      return <LangContext.Provider value={{lang,setLang:changeLang,t}}>{children}</LangContext.Provider>;
     }
 
     function StudentProvider({children}){
@@ -116,7 +143,6 @@
           student=newStudent;
         }
 
-        // Get active session with scenario
         const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroom.id).eq('status','active').order('started_at',{ascending:false}).limit(1);
         const session=sessions?.[0]||null;
         const scenario=session?.scenarios||null;
@@ -141,9 +167,19 @@
     // Components
     const StarBackground=()=>{const stars=useMemo(()=>Array.from({length:40},(_,i)=>({id:i,left:Math.random()*100,top:Math.random()*100,size:Math.random()*2+1,delay:Math.random()*3})),[]);return<div className="star-bg">{stars.map(s=><div key={s.id} className="star animate-pulse" style={{left:`${s.left}%`,top:`${s.top}%`,width:s.size,height:s.size,animationDelay:`${s.delay}s`}}/>)}</div>;};
 
+    // Language Selector
+    function LangSelector(){
+      const{lang,setLang}=useContext(LangContext);
+      const{LANGUAGES}=useContext(ContentContext);
+      return<div className="flex gap-1">
+        {LANGUAGES.map(l=><button key={l.code} onClick={()=>setLang(l.code)} className={`text-lg ${lang===l.code?'opacity-100':'opacity-40 hover:opacity-70'}`} title={l.name}>{l.flag}</button>)}
+      </div>;
+    }
+
     // Login Screen
     function LoginScreen(){
       const{login}=useContext(StudentContext);
+      const{t}=useContext(LangContext);
       const[joinCode,setJoinCode]=useState('');
       const[displayName,setDisplayName]=useState('');
       const[pin,setPin]=useState('');
@@ -152,8 +188,8 @@
 
       const handleSubmit=async(e)=>{
         e.preventDefault();
-        if(!joinCode||!displayName||!pin){setError('Please fill all fields');return;}
-        if(pin.length!==4||!/^\d+$/.test(pin)){setError('PIN must be 4 digits');return;}
+        if(!joinCode||!displayName||!pin){setError(t('fillAllFields','Please fill all fields'));return;}
+        if(pin.length!==4||!/^\d+$/.test(pin)){setError(t('pinMustBe4','PIN must be 4 digits'));return;}
         setLoading(true);setError('');
         try{await login(joinCode.trim(),displayName.trim(),pin);}
         catch(err){setError(err.message);}
@@ -163,29 +199,30 @@
       return<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
         <StarBackground/>
         <div className="max-w-sm w-full relative z-10 animate-fadeIn">
+          <div className="flex justify-end mb-2"><LangSelector/></div>
           <div className="text-center mb-8">
             <h1 className="text-4xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
             <p className="text-blue-300/80 text-sm tracking-widest">SCHOOL EDITION</p>
           </div>
           <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-blue-500/30 rounded-2xl p-6 space-y-4">
             <div>
-              <label className="text-sm text-gray-400 block mb-1">Class Code</label>
+              <label className="text-sm text-gray-400 block mb-1">{t('classCode','Class Code')}</label>
               <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} placeholder="MARS-7X2K" maxLength={10} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-xl tracking-widest uppercase focus:border-blue-500 focus:outline-none"/>
             </div>
             <div>
-              <label className="text-sm text-gray-400 block mb-1">Your Name</label>
+              <label className="text-sm text-gray-400 block mb-1">{t('yourName','Your Name')}</label>
               <input type="text" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Alex" maxLength={20} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"/>
             </div>
             <div>
-              <label className="text-sm text-gray-400 block mb-1">PIN (4 digits)</label>
+              <label className="text-sm text-gray-400 block mb-1">{t('pin','PIN')} ({t('pinDigits','4 digits')})</label>
               <input type="password" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="••••" maxLength={4} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest focus:border-blue-500 focus:outline-none"/>
             </div>
             {error&&<p className="text-red-400 text-sm text-center">{error}</p>}
             <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50">
-              {loading?'Loading...':'Join'} 🚀
+              {loading?t('loading','Loading...'):t('join','Join')} 🚀
             </button>
           </form>
-          <p className="text-center text-gray-500 text-xs mt-6">Ask your teacher for the class code</p>
+          <p className="text-center text-gray-500 text-xs mt-6">{t('askTeacher','Ask your teacher for the class code')}</p>
         </div>
       </div>;
     }
@@ -194,7 +231,7 @@
     function Game(){
       const{student,classroom,session,scenario,logout,refreshSession}=useContext(StudentContext);
       const{T,SYSTEMS,PLANETS,EVENTS}=useContext(ContentContext);
-      const lang='en';
+      const{lang,t}=useContext(LangContext);
 
       // Scenario settings
       const maxTurns=scenario?.max_turns||12;
@@ -203,18 +240,11 @@
       const targetStability=scenario?.target_stability||60;
       const reflectionQuestions=scenario?.reflection_questions||[];
 
-      // Filter systems based on scenario - recalculate when SYSTEMS or scenario changes
+      // Filter systems
       const availableSystems=useMemo(()=>{
-        // If no scenario (Free Play) or no allowed_systems specified, show all
-        if(!scenario || !scenario.allowed_systems || !scenario.allowed_systems.length){
-          return SYSTEMS;
-        }
-        // Filter to only allowed systems
+        if(!scenario||!scenario.allowed_systems||!scenario.allowed_systems.length)return SYSTEMS;
         const filtered={};
-        scenario.allowed_systems.forEach(id=>{
-          if(SYSTEMS[id])filtered[id]=SYSTEMS[id];
-        });
-        // If filtering resulted in empty (bad data), return all systems
+        scenario.allowed_systems.forEach(id=>{if(SYSTEMS[id])filtered[id]=SYSTEMS[id];});
         return Object.keys(filtered).length>0?filtered:SYSTEMS;
       },[scenario,SYSTEMS]);
 
@@ -233,16 +263,22 @@
       const[reflectionAnswers,setReflectionAnswers]=useState({});
       const[classLeaderboard,setClassLeaderboard]=useState([]);
 
-      // Update selected system if not in available systems
       useEffect(()=>{
         const available=Object.keys(availableSystems);
-        if(available.length>0 && !availableSystems[system]){
-          setSystem(available[0]);
-        }
+        if(available.length>0&&!availableSystems[system])setSystem(available[0]);
       },[availableSystems]);
 
       const sys=SYSTEMS[system]||Object.values(SYSTEMS)[0];
       const planet=PLANETS[planetId]||Object.values(PLANETS)[0];
+
+      // Budget items with icons and what they affect
+      const budgetItems=[
+        {id:'defence',icon:'🛡️',stat:'⚖️'},
+        {id:'education',icon:'📚',stat:'💰'},
+        {id:'health',icon:'🏥',stat:'😊'},
+        {id:'infra',icon:'🏗️',stat:'💰'},
+        {id:'welfare',icon:'🤝',stat:'😊'}
+      ];
 
       // Load leaderboard
       useEffect(()=>{
@@ -250,7 +286,6 @@
         supabase.from('student_results').select('student_id,final_score,is_victory,students(display_name)').eq('session_id',session.id).order('final_score',{ascending:false}).limit(10).then(({data})=>{if(data)setClassLeaderboard(data);});
       },[session,phase]);
 
-      // Check for session changes
       useEffect(()=>{if(phase==='lobby')refreshSession();},[phase]);
 
       const startGame=()=>{
@@ -316,14 +351,9 @@
       };
 
       const handleChoice=(choice)=>{
-        // Enhanced decision log with event details
         setDecisionsLog(prev=>[...prev,{
-          turn,
-          eventId:event?.id,
-          eventTitle:event?.title?.en||'Event',
-          eventIcon:event?.icon||'❓',
-          choice:choice.text?.en,
-          effects:choice.effects||{}
+          turn,eventId:event?.id,eventTitle:event?.title?.[lang]||event?.title?.en||'Event',
+          eventIcon:event?.icon||'❓',choice:choice.text?.[lang]||choice.text?.en,effects:choice.effects||{}
         }]);
         const effects=choice.effects||{};
         const newStats={
@@ -337,55 +367,55 @@
         if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setEvent(null);setPhase('playing');}
       };
 
-      // Generate narrative summary of the game
+      // Generate summary
       const generateSummary=useCallback(()=>{
-        const sysName=SYSTEMS[system]?.name?.en||system;
-        const planetName=PLANETS[planetId]?.name?.en||planetId;
+        const sysName=SYSTEMS[system]?.name?.[lang]||SYSTEMS[system]?.name?.en||system;
+        const planetName=PLANETS[planetId]?.name?.[lang]||PLANETS[planetId]?.name?.en||planetId;
         const isVictory=phase==='victory';
         
-        let summary=`Your ${sysName} on ${planetName} `;
+        let summary=`${sysName} (${planetName}) `;
         
         if(isVictory){
-          summary+=`successfully governed for ${turn} years. `;
+          summary+=`${t('summaryGovSuccess','successfully governed for')} ${turn} ${t('summaryYears','years')}. `;
         }else{
-          const failReason=stats.happiness<=0?'citizen unhappiness':stats.wealth<=0?'economic collapse':'political instability';
-          summary+=`collapsed after ${turn} years due to ${failReason}. `;
+          const reasons={
+            happiness:t('summaryUnhappiness','citizen unhappiness'),
+            wealth:t('summaryEconomic','economic collapse'),
+            stability:t('summaryInstability','political instability')
+          };
+          const failReason=stats.happiness<=0?reasons.happiness:stats.wealth<=0?reasons.wealth:reasons.stability;
+          summary+=`${t('summaryGovCollapse','collapsed after')} ${turn} ${t('summaryYears','years')} ${t('summaryDueTo','due to')} ${failReason}. `;
         }
         
-        // Analyze budget priorities
-        const avgBudget={...budget};
-        const topPriority=Object.entries(avgBudget).sort((a,b)=>b[1]-a[1])[0];
-        const budgetLabels={defence:'military and defence',education:'education',health:'healthcare',infra:'infrastructure',welfare:'social welfare'};
-        summary+=`Your government prioritized ${budgetLabels[topPriority[0]]||topPriority[0]} spending. `;
+        const budgetLabels={
+          defence:t('budgetDefence','defence'),
+          education:t('budgetEducation','education'),
+          health:t('budgetHealth','health'),
+          infra:t('budgetInfra','infrastructure'),
+          welfare:t('budgetWelfare','welfare')
+        };
+        const topPriority=Object.entries(budget).sort((a,b)=>b[1]-a[1])[0];
+        summary+=`${t('summaryPrioritized','Your government prioritized')} ${budgetLabels[topPriority[0]]||topPriority[0]} ${t('summarySpending','spending')}. `;
         
-        // Key events narrative
         if(decisionsLog.length>0){
-          summary+='\n\nKey moments:\n';
-          decisionsLog.slice(0,5).forEach((d,i)=>{
+          summary+=`\n\n${t('summaryKeyMoments','Key moments')}:\n`;
+          decisionsLog.slice(0,5).forEach(d=>{
             const effectText=Object.entries(d.effects||{}).map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(', ');
-            summary+=`• Year ${d.turn}: ${d.eventIcon} ${d.eventTitle} — You chose: "${d.choice}"${effectText?' ('+effectText+')':''}\n`;
+            summary+=`• ${t('year','Year')} ${d.turn}: ${d.eventIcon} ${d.eventTitle} — ${t('summaryYouChose','You chose')}: "${d.choice}"${effectText?' ('+effectText+')':''}\n`;
           });
-          if(decisionsLog.length>5){
-            summary+=`...and ${decisionsLog.length-5} more decisions.\n`;
-          }
+          if(decisionsLog.length>5)summary+=`...${decisionsLog.length-5} ${t('summaryMoreDecisions','more decisions')}.\n`;
         }
         
-        // Final assessment
         summary+='\n';
         if(isVictory){
-          if(stats.happiness>=80&&stats.wealth>=80&&stats.stability>=80){
-            summary+='🌟 Outstanding! You achieved near-perfect balance across all metrics.';
-          }else if(stats.happiness>=targetHappiness&&stats.wealth>=targetWealth&&stats.stability>=targetStability){
-            summary+='✅ Well done! You met all target goals for your colony.';
-          }else{
-            summary+='⚠️ You survived, but there is room for improvement.';
-          }
+          if(stats.happiness>=80&&stats.wealth>=80&&stats.stability>=80)summary+='🌟 '+t('summaryOutstanding','Outstanding! Near-perfect balance.');
+          else if(stats.happiness>=targetHappiness&&stats.wealth>=targetWealth&&stats.stability>=targetStability)summary+='✅ '+t('summaryWellDone','Well done! All goals met.');
+          else summary+='⚠️ '+t('summarySurvived','You survived, but room to improve.');
         }else{
-          summary+='💡 Consider: What budget changes or different decisions might have prevented this outcome?';
+          summary+='💡 '+t('summaryConsider','Consider: What might have prevented this?');
         }
-        
         return summary;
-      },[system,planetId,turn,stats,budget,decisionsLog,phase,SYSTEMS,PLANETS,targetHappiness,targetWealth,targetStability]);
+      },[system,planetId,turn,stats,budget,decisionsLog,phase,SYSTEMS,PLANETS,targetHappiness,targetWealth,targetStability,lang,t]);
 
       const submitReflection=async()=>{
         if(student&&session){
@@ -398,75 +428,74 @@
       if(phase==='lobby'){
         return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
           <div className="max-w-md mx-auto pt-4 relative z-10">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-4">
               <div><p className="text-blue-300 font-bold">{student?.display_name}</p><p className="text-gray-500 text-sm">{classroom?.name}</p></div>
-              <button onClick={logout} className="text-gray-400 hover:text-white text-sm">Logout</button>
+              <div className="flex items-center gap-3">
+                <LangSelector/>
+                <button onClick={logout} className="text-gray-400 hover:text-white text-sm">{t('logout','Logout')}</button>
+              </div>
             </div>
 
-            {/* Scenario Info */}
             {scenario&&<div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-4">
-              <h3 className="font-bold text-blue-300">{scenario.title?.en||'Scenario'}</h3>
-              <p className="text-sm text-gray-400 mt-1">{scenario.description?.en}</p>
+              <h3 className="font-bold text-blue-300">{scenario.title?.[lang]||scenario.title?.en||'Scenario'}</h3>
+              <p className="text-sm text-gray-400 mt-1">{scenario.description?.[lang]||scenario.description?.en}</p>
               <div className="flex gap-4 mt-2 text-xs text-gray-500">
                 <span>⏱️ {scenario.duration_minutes} min</span>
-                <span>🔄 {maxTurns} turns</span>
-                <span className="text-blue-400">{scenario.curriculum_topic}</span>
+                <span>🔄 {maxTurns} {t('summaryYears','turns')}</span>
               </div>
             </div>}
 
             {!session&&<div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-4 mb-4 text-center">
-              <p className="text-yellow-400">⏳ Waiting for teacher to start session...</p>
-              <button onClick={refreshSession} className="mt-2 text-sm text-blue-400 underline">Refresh</button>
+              <p className="text-yellow-400">⏳ {t('waiting','Waiting for teacher to start session...')}</p>
+              <button onClick={refreshSession} className="mt-2 text-sm text-blue-400 underline">{t('refresh','Refresh')}</button>
             </div>}
 
             <div className="text-center mb-4">
               <h1 className="text-3xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
-              <p className="text-gray-400 text-sm">Lead a colony to prosperity through your political decisions</p>
+              <p className="text-gray-400 text-sm">{t('subtitle','Lead a colony to prosperity through your political decisions')}</p>
             </div>
 
             {/* How to Play */}
             <details className="bg-slate-800/30 border border-slate-700 rounded-xl p-4 mb-4">
-              <summary className="text-blue-300 font-bold cursor-pointer">📖 How to Play</summary>
+              <summary className="text-blue-300 font-bold cursor-pointer">{t('howToPlayTitle','📖 How to Play')}</summary>
               <div className="mt-3 text-sm text-gray-400 space-y-2">
-                <p><strong className="text-white">🎯 Goal:</strong> Keep your colony stable for {maxTurns} years while maintaining Happiness, Wealth, and Stability above the target levels.</p>
-                <p><strong className="text-white">🏛️ Political System:</strong> Each system has unique traits. Democracies are stable but slow; dictatorships are efficient but risky.</p>
-                <p><strong className="text-white">💰 Budget:</strong> Allocate resources each year. Welfare & Health → Happiness. Infrastructure & Education → Wealth. Defence → Stability.</p>
-                <p><strong className="text-white">⚡ Events:</strong> Random crises will test your leadership. Your choices have consequences!</p>
-                <p><strong className="text-white">💀 Defeat:</strong> If any stat drops to 0%, your government collapses.</p>
+                <p><strong className="text-white">🎯</strong> {t('howToPlayGoal','Keep your colony stable while maintaining Happiness, Wealth, and Stability above target levels.')}</p>
+                <p><strong className="text-white">🏛️</strong> {t('howToPlaySystem','Each political system has unique traits. Democracies are stable but slow; dictatorships are efficient but risky.')}</p>
+                <p><strong className="text-white">💰</strong> {t('howToPlayBudget','Allocate resources each year. Welfare & Health → Happiness. Infrastructure & Education → Wealth. Defence → Stability.')}</p>
+                <p><strong className="text-white">⚡</strong> {t('howToPlayEvents','Random crises will test your leadership. Your choices have consequences!')}</p>
+                <p><strong className="text-white">💀</strong> {t('howToPlayDefeat','If any stat drops to 0%, your government collapses.')}</p>
               </div>
             </details>
 
             {/* System Selection */}
             <div className="mb-4">
-              <label className="text-sm text-gray-400 block mb-2">🏛️ Political System {scenario&&<span className="text-blue-400">({Object.keys(availableSystems).length} available)</span>}</label>
+              <label className="text-sm text-gray-400 block mb-2">🏛️ {t('politicalSystem','Political System')} {scenario&&<span className="text-blue-400">({Object.keys(availableSystems).length} {t('available','available')})</span>}</label>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(availableSystems).map(([id,s])=><button key={id} onClick={()=>setSystem(id)} className={`p-3 rounded-lg border text-left transition ${system===id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
                   <span className="text-2xl">{s.icon}</span>
-                  <p className="text-sm text-white mt-1">{s.name?.[lang]||id}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{s.traits?.stabilityBonus>0?'Stable':'Flexible'} • {s.is_premium?'Advanced':'Basic'}</p>
+                  <p className="text-sm text-white mt-1">{s.name?.[lang]||s.name?.en||id}</p>
+                  <p className="text-xs text-gray-500">{s.traits?.stabilityBonus>0?t('systemStable','Stable'):t('systemFlexible','Flexible')} • {s.is_premium?t('systemAdvanced','Advanced'):t('systemBasic','Basic')}</p>
                 </button>)}
               </div>
-              {/* Selected system description */}
               {availableSystems[system]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                <p className="text-sm text-gray-300">{T.systems[system]?.desc?.[lang]||availableSystems[system]?.description?.[lang]||'Choose your political system wisely. Each has unique strengths and challenges.'}</p>
+                <p className="text-sm text-gray-300">{availableSystems[system]?.description?.[lang]||availableSystems[system]?.description?.en||t('defaultSystemDesc','Choose your political system wisely. Each has unique strengths and challenges.')}</p>
               </div>}
             </div>
 
             {/* Planet Selection */}
             <div className="mb-4">
-              <label className="text-sm text-gray-400 block mb-2">🌍 Planet</label>
+              <label className="text-sm text-gray-400 block mb-2">🌍 {t('planet','Planet')}</label>
               <div className="grid grid-cols-5 gap-2">
-                {Object.entries(PLANETS).map(([id,p])=><button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={p.name?.[lang]||id}>
+                {Object.entries(PLANETS).map(([id,p])=><button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={p.name?.[lang]||p.name?.en||id}>
                   <span className="text-2xl">{p.icon}</span>
                 </button>)}
               </div>
-              {/* Selected planet description */}
               {PLANETS[planetId]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-white font-bold">{T.planets[planetId]?.name?.[lang]||PLANETS[planetId]?.name?.[lang]||planetId}</span>
-                  <span className="text-xs text-gray-500">Difficulty: {'⭐'.repeat(PLANETS[planetId]?.difficulty||1)}</span>
+                  <span className="text-white font-bold">{PLANETS[planetId]?.name?.[lang]||PLANETS[planetId]?.name?.en||planetId}</span>
+                  <span className="text-xs text-gray-500">{t('difficulty','Difficulty')}: {'⭐'.repeat(PLANETS[planetId]?.difficulty||1)}</span>
                 </div>
-                <p className="text-xs text-gray-400">{T.planets[planetId]?.desc?.[lang]||PLANETS[planetId]?.description?.[lang]||'A new world awaits your leadership.'}</p>
+                <p className="text-xs text-gray-400">{PLANETS[planetId]?.description?.[lang]||PLANETS[planetId]?.description?.en||t('defaultPlanetDesc','A new world awaits your leadership.')}</p>
                 <div className="flex gap-2 mt-2 text-xs">
                   <span className="text-green-400">😊{PLANETS[planetId]?.stats?.happiness||60}%</span>
                   <span className="text-yellow-400">💰{PLANETS[planetId]?.stats?.wealth||50}%</span>
@@ -476,12 +505,11 @@
             </div>
 
             <button onClick={startGame} disabled={!session} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-              🚀 Play
+              🚀 {t('play','Play')}
             </button>
 
-            {/* Leaderboard */}
             {classLeaderboard.length>0&&<div className="mt-6 bg-slate-800/50 rounded-xl p-4 border border-blue-500/20">
-              <h3 className="text-blue-300 font-bold mb-3">🏆 Class Leaderboard</h3>
+              <h3 className="text-blue-300 font-bold mb-3">🏆 {t('leaderboard','Class Leaderboard')}</h3>
               <div className="space-y-2">
                 {classLeaderboard.slice(0,5).map((r,i)=><div key={i} className="flex justify-between text-sm">
                   <span className="text-gray-300">{i+1}. {r.students?.display_name}</span>
@@ -495,37 +523,38 @@
 
       // PLAYING
       if(phase==='playing'){
+        const totalBudget=Object.values(budget).reduce((a,b)=>a+b,0);
         return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
           <div className="max-w-md mx-auto relative z-10">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{sys.icon}</span>
-                <span className="text-blue-300 font-bold">{T?.systems?.[system]?.leader?.[lang]||system}</span>
+                <span className="text-blue-300 font-bold">{sys.name?.[lang]||sys.name?.en||system}</span>
               </div>
               <div className="text-right">
-                <span className="text-blue-400 font-display">Year {turn}/{maxTurns}</span>
-                <p className="text-xs text-gray-500">{T?.planets?.[planetId]?.name?.[lang]||planetId}</p>
+                <span className="text-blue-400 font-display">{t('year','Year')} {turn}/{maxTurns}</span>
+                <p className="text-xs text-gray-500">{PLANETS[planetId]?.name?.[lang]||planetId}</p>
               </div>
             </div>
 
             {/* Stats */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
               <div className="mb-2">
-                <div className="flex justify-between text-xs mb-1"><span>😊 Happiness</span><span className={`font-bold ${stats.happiness>=targetHappiness?'text-green-400':'text-white'}`}>{Math.round(stats.happiness)}%</span></div>
+                <div className="flex justify-between text-xs mb-1"><span>😊 {t('happiness','Happiness')}</span><span className={`font-bold ${stats.happiness>=targetHappiness?'text-green-400':'text-white'}`}>{Math.round(stats.happiness)}%</span></div>
                 <div className="h-2 bg-slate-900 rounded overflow-hidden relative">
                   <div className="h-full bg-green-500" style={{width:`${stats.happiness}%`}}/>
                   <div className="absolute top-0 h-full w-0.5 bg-yellow-400" style={{left:`${targetHappiness}%`}}/>
                 </div>
               </div>
               <div className="mb-2">
-                <div className="flex justify-between text-xs mb-1"><span>💰 Wealth</span><span className={`font-bold ${stats.wealth>=targetWealth?'text-green-400':'text-white'}`}>{Math.round(stats.wealth)}%</span></div>
+                <div className="flex justify-between text-xs mb-1"><span>💰 {t('wealth','Wealth')}</span><span className={`font-bold ${stats.wealth>=targetWealth?'text-green-400':'text-white'}`}>{Math.round(stats.wealth)}%</span></div>
                 <div className="h-2 bg-slate-900 rounded overflow-hidden relative">
                   <div className="h-full bg-yellow-500" style={{width:`${stats.wealth}%`}}/>
                   <div className="absolute top-0 h-full w-0.5 bg-yellow-400" style={{left:`${targetWealth}%`}}/>
                 </div>
               </div>
               <div>
-                <div className="flex justify-between text-xs mb-1"><span>⚖️ Stability</span><span className={`font-bold ${stats.stability>=targetStability?'text-green-400':'text-white'}`}>{Math.round(stats.stability)}%</span></div>
+                <div className="flex justify-between text-xs mb-1"><span>⚖️ {t('stability','Stability')}</span><span className={`font-bold ${stats.stability>=targetStability?'text-green-400':'text-white'}`}>{Math.round(stats.stability)}%</span></div>
                 <div className="h-2 bg-slate-900 rounded overflow-hidden relative">
                   <div className="h-full bg-blue-500" style={{width:`${stats.stability}%`}}/>
                   <div className="absolute top-0 h-full w-0.5 bg-yellow-400" style={{left:`${targetStability}%`}}/>
@@ -536,30 +565,26 @@
             {/* Budget */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
               <div className="flex justify-between mb-2">
-                <span className="text-gray-400">Budget <span className={`font-bold ${Object.values(budget).reduce((a,b)=>a+b,0)>100?'text-red-400':'text-white'}`}>({Object.values(budget).reduce((a,b)=>a+b,0)}%/100%)</span></span>
+                <span className="text-gray-400">{t('budgetTitle','Budget')} <span className={`font-bold ${totalBudget>100?'text-red-400':'text-white'}`}>({totalBudget}%/100%)</span></span>
                 <span className="text-blue-400 font-bold">💎 {Math.round(hydrobite)}</span>
               </div>
-              <p className="text-xs text-gray-500 mb-3">Allocate your resources wisely. Higher spending costs more Hydrobite.</p>
-              {[
-                {id:'defence',icon:'🛡️',hint:'→ ⚖️ Stability'},
-                {id:'education',icon:'📚',hint:'→ 💰 Wealth'},
-                {id:'health',icon:'🏥',hint:'→ 😊 Happiness'},
-                {id:'infra',icon:'🏗️',hint:'→ 💰 Wealth'},
-                {id:'welfare',icon:'🤝',hint:'→ 😊 Happiness'}
-              ].map(({id,icon,hint})=>{
+              <p className="text-xs text-gray-500 mb-3">{t('budgetHint','Allocate your resources wisely. Higher spending costs more Hydrobite.')}</p>
+              {budgetItems.map(({id,icon,stat})=>{
                 const others=Object.entries(budget).filter(([k])=>k!==id).reduce((sum,[,v])=>sum+(v||0),0);
                 const maxForThis=Math.min(50,100-others);
+                const label=t('budget'+id.charAt(0).toUpperCase()+id.slice(1),id);
                 return<div key={id} className="mb-2">
-                <div className="flex justify-between text-xs mb-1">
-                  <span>{icon} <span className="capitalize">{id}</span> <span className="text-gray-600">{hint}</span></span>
-                  <span>{budget[id]}%</span>
-                </div>
-                <input type="range" min="0" max={maxForThis} value={Math.min(budget[id],maxForThis)} onChange={e=>setBudget(prev=>({...prev,[id]:Math.min(parseInt(e.target.value)||0,maxForThis)}))} className="w-full bg-slate-700"/>
-              </div>})}
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>{icon} {label} <span className="text-gray-600">→ {stat}</span></span>
+                    <span>{budget[id]}%</span>
+                  </div>
+                  <input type="range" min="0" max={maxForThis} value={Math.min(budget[id],maxForThis)} onChange={e=>setBudget(prev=>({...prev,[id]:Math.min(parseInt(e.target.value)||0,maxForThis)}))} className="w-full bg-slate-700"/>
+                </div>;
+              })}
             </div>
 
-            <button onClick={nextTurn} disabled={Object.values(budget).reduce((a,b)=>a+b,0)>100} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-              {Object.values(budget).reduce((a,b)=>a+b,0)>100?'Budget exceeds 100%':'Next →'}
+            <button onClick={nextTurn} disabled={totalBudget>100} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+              {totalBudget>100?t('budgetExceeds','Budget exceeds 100%'):t('next','Next')+' →'}
             </button>
           </div>
         </div>;
@@ -600,36 +625,23 @@
             <div className={`bg-gradient-to-b ${isVictory?'from-blue-900/50':'from-red-900/50'} to-slate-800 rounded-2xl border ${isVictory?'border-blue-500/50':'border-red-500/50'} p-6`}>
               <div className="text-center">
                 <span className="text-5xl block mb-2">{isVictory?'🏆':'💀'}</span>
-                <h1 className={`text-2xl font-display font-bold ${isVictory?'gold-gradient':'text-red-400'} mb-2`}>{isVictory?'Victory!':'Defeat'}</h1>
+                <h1 className={`text-2xl font-display font-bold ${isVictory?'gold-gradient':'text-red-400'} mb-2`}>{isVictory?t('victory','Victory!'):t('defeat','Defeat')}</h1>
                 <div className="inline-block bg-slate-800/50 rounded-xl px-6 py-3 mb-4">
                   <div className="text-3xl font-bold text-blue-400">{finalScore}</div>
-                  <p className="text-gray-400 text-sm">Score</p>
+                  <p className="text-gray-400 text-sm">{t('score','Score')}</p>
                 </div>
               </div>
-              
               <div className="grid grid-cols-3 gap-3 mb-4">
-                <div className="text-center bg-slate-800/30 rounded-lg p-2">
-                  <span className="text-xl">😊</span>
-                  <p className={`font-bold text-sm ${stats.happiness>=targetHappiness?'text-green-400':'text-red-400'}`}>{Math.round(stats.happiness)}%</p>
-                </div>
-                <div className="text-center bg-slate-800/30 rounded-lg p-2">
-                  <span className="text-xl">💰</span>
-                  <p className={`font-bold text-sm ${stats.wealth>=targetWealth?'text-green-400':'text-red-400'}`}>{Math.round(stats.wealth)}%</p>
-                </div>
-                <div className="text-center bg-slate-800/30 rounded-lg p-2">
-                  <span className="text-xl">⚖️</span>
-                  <p className={`font-bold text-sm ${stats.stability>=targetStability?'text-green-400':'text-red-400'}`}>{Math.round(stats.stability)}%</p>
-                </div>
+                <div className="text-center bg-slate-800/30 rounded-lg p-2"><span className="text-xl">😊</span><p className={`font-bold text-sm ${stats.happiness>=targetHappiness?'text-green-400':'text-red-400'}`}>{Math.round(stats.happiness)}%</p></div>
+                <div className="text-center bg-slate-800/30 rounded-lg p-2"><span className="text-xl">💰</span><p className={`font-bold text-sm ${stats.wealth>=targetWealth?'text-green-400':'text-red-400'}`}>{Math.round(stats.wealth)}%</p></div>
+                <div className="text-center bg-slate-800/30 rounded-lg p-2"><span className="text-xl">⚖️</span><p className={`font-bold text-sm ${stats.stability>=targetStability?'text-green-400':'text-red-400'}`}>{Math.round(stats.stability)}%</p></div>
               </div>
-
-              {/* Summary */}
               <div className="bg-slate-900/50 rounded-xl p-4 mb-4 max-h-48 overflow-y-auto">
-                <h3 className="text-blue-300 font-bold text-sm mb-2">📜 Your Story</h3>
+                <h3 className="text-blue-300 font-bold text-sm mb-2">📜 {t('yourStory','Your Story')}</h3>
                 <p className="text-gray-300 text-sm whitespace-pre-line">{summary}</p>
               </div>
-              
               <button onClick={()=>setPhase('reflection')} className={`w-full py-3 bg-gradient-to-r ${isVictory?'from-blue-600 to-blue-500':'from-red-600 to-red-500'} text-white rounded-xl font-bold`}>
-                📝 Reflection →
+                📝 {t('reflection','Reflection')} →
               </button>
             </div>
           </div>
@@ -638,23 +650,24 @@
 
       // REFLECTION
       if(phase==='reflection'){
-        const questions=reflectionQuestions.length?reflectionQuestions:[
-          {en:'Why did you choose this political system?'},
-          {en:'What would you do differently next time?'},
-          {en:'What did you learn about governing?'}
+        const defaultQs=[
+          {en:t('reflectionQ1','Why did you choose this political system?'),ru:t('reflectionQ1')},
+          {en:t('reflectionQ2','What would you do differently next time?'),ru:t('reflectionQ2')},
+          {en:t('reflectionQ3','What did you learn about governing?'),ru:t('reflectionQ3')}
         ];
+        const questions=reflectionQuestions.length?reflectionQuestions:defaultQs;
         return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
           <div className="max-w-md mx-auto pt-8 relative z-10">
-            <h2 className="text-2xl font-display font-bold text-blue-400 mb-6 text-center">📝 Reflection</h2>
+            <h2 className="text-2xl font-display font-bold text-blue-400 mb-6 text-center">📝 {t('reflection','Reflection')}</h2>
             <div className="space-y-4">
               {questions.map((q,i)=><div key={i} className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20">
-                <p className="text-gray-300 mb-2">{q.en||q}</p>
-                <textarea value={reflectionAnswers[`q${i+1}`]||''} onChange={e=>setReflectionAnswers(prev=>({...prev,[`q${i+1}`]:e.target.value}))} rows={3} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none" placeholder="Your answer..."/>
+                <p className="text-gray-300 mb-2">{q[lang]||q.en||q}</p>
+                <textarea value={reflectionAnswers[`q${i+1}`]||''} onChange={e=>setReflectionAnswers(prev=>({...prev,[`q${i+1}`]:e.target.value}))} rows={3} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none" placeholder={t('reflectionPlaceholder','Your answer...')}/>
               </div>)}
             </div>
             <div className="flex gap-3 mt-6">
-              <button onClick={()=>setPhase('lobby')} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl">Skip</button>
-              <button onClick={submitReflection} className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-bold">Submit</button>
+              <button onClick={()=>setPhase('lobby')} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl">{t('skip','Skip')}</button>
+              <button onClick={submitReflection} className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-bold">{t('submit','Submit')}</button>
             </div>
           </div>
         </div>;
@@ -670,7 +683,7 @@
     }
 
     function Root(){
-      return<ContentProvider><StudentProvider><App/></StudentProvider></ContentProvider>;
+      return<ContentProvider><LangProvider><StudentProvider><App/></StudentProvider></LangProvider></ContentProvider>;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
