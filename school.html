@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="description" content="Independence - Civic Education Game for Schools">
+  <title>Independence - School Edition</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Raleway:wght@300;400;600;700&display=swap');
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;padding:0;font-family:'Raleway',sans-serif;background:#0f172a;overscroll-behavior:none}
+    .font-display{font-family:'Cinzel',serif}
+    .gold-gradient{background:linear-gradient(180deg,#60a5fa 0%,#2563eb 50%,#1e40af 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    input[type="range"]{-webkit-appearance:none;height:8px;border-radius:4px}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#60a5fa,#2563eb);cursor:pointer}
+    input[type="text"],input[type="password"]{-webkit-appearance:none;appearance:none}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .animate-fadeIn{animation:fadeIn .3s ease-out}.animate-slideUp{animation:slideUp .4s ease-out}
+    .animate-pulse{animation:pulse 2s infinite}.animate-spin{animation:spin 1s linear infinite}
+    button{min-height:44px;cursor:pointer;transition:all .15s}button:active{transform:scale(.97)}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem}
+    .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:200;max-width:90%}
+    .star-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+    .star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;opacity:.5}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const{useState,useEffect,useCallback,createContext,useContext,useMemo}=React;
+
+    // ===== CONFIG =====
+    const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
+    const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+    const CONTENT_CACHE_KEY='independence_school_content_v1';
+    const CONTENT_CACHE_TTL=1000*60*30;
+
+    // ===== FALLBACK CONTENT =====
+    const FALLBACK_CONTENT={
+      T:{ui:{title:{en:'Independence',ru:'Независимость'},subtitle:{en:'School Edition',ru:'Школьная версия'},joinClass:{en:'Join Class',ru:'Войти в класс'},classCode:{en:'Class Code',ru:'Код класса'},yourName:{en:'Your Name',ru:'Твоё имя'},pin:{en:'PIN',ru:'ПИН'},join:{en:'Join',ru:'Войти'},play:{en:'Play',ru:'Играть'},loading:{en:'Loading...',ru:'Загрузка...'},year:{en:'Year',ru:'Год'},happiness:{en:'Happiness',ru:'Счастье'},wealth:{en:'Wealth',ru:'Богатство'},stability:{en:'Stability',ru:'Стабильность'},victory:{en:'Victory!',ru:'Победа!'},defeat:{en:'Defeat',ru:'Поражение'},score:{en:'Score',ru:'Очки'},playAgain:{en:'Play Again',ru:'Играть снова'},reflection:{en:'Reflection',ru:'Рефлексия'},submit:{en:'Submit',ru:'Отправить'},skip:{en:'Skip',ru:'Пропустить'},next:{en:'Next',ru:'Далее'},back:{en:'Back',ru:'Назад'},leaderboard:{en:'Class Leaderboard',ru:'Рейтинг класса'}}},
+      SYSTEMS:{parliamentary:{id:'parliamentary',icon:'🏛️',name:{en:'Parliamentary Democracy',ru:'Парламентская демократия'},traits:{budgetMod:1,eventMod:1,stabilityBonus:5}}},
+      PLANETS:{terranova:{id:'terranova',icon:'🌍',name:{en:'Terra Nova',ru:'Терра Нова'},difficulty:1,stats:{happiness:60,wealth:50,stability:70},mods:{happiness:1,wealth:1,stability:1}}},
+      EVENTS:[],SECTORS:{},DIFFICULTIES:{normal:{id:'normal',icon:'⚖️',budgetMod:1,eventMod:1}},LANGUAGES:[{code:'en',name:'English',flag:'🇬🇧'}]
+    };
+
+    // ===== CONTENT LOADER =====
+    const loadContentFromDB=async()=>{
+      try{
+        const[langs,texts,systems,planets,events,sectors,diffs]=await Promise.all([
+          supabase.from('languages').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('ui_texts').select('*'),
+          supabase.from('political_systems').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('planets').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('events').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('budget_sectors').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('difficulties').select('*').eq('is_active',true).order('sort_order'),
+        ]);
+        if(langs.error||texts.error||systems.error)throw new Error('DB query failed');
+        const data={languages:langs.data||[],ui_texts:texts.data||[],systems:systems.data||[],planets:planets.data||[],events:events.data||[],sectors:sectors.data||[],difficulties:diffs.data||[]};
+        localStorage.setItem(CONTENT_CACHE_KEY,JSON.stringify({data,timestamp:Date.now()}));
+        return data;
+      }catch(e){console.error('DB load failed:',e);return null;}
+    };
+
+    const loadContentFromCache=()=>{
+      try{
+        const cached=localStorage.getItem(CONTENT_CACHE_KEY);
+        if(cached){const{data,timestamp}=JSON.parse(cached);if(Date.now()-timestamp<CONTENT_CACHE_TTL)return data;}
+      }catch(e){}
+      return null;
+    };
+
+    const transformContent=(raw)=>{
+      if(!raw)return null;
+      const T={ui:{},intro:{},systems:{},planets:{},victoryMsg:{},defeat:{}};
+      raw.ui_texts?.forEach(t=>{const[cat,key]=t.key.split('.');if(cat&&key){if(!T[cat])T[cat]={};T[cat][key]=t.value;}});
+      const SYSTEMS={};raw.systems?.forEach(s=>{SYSTEMS[s.id]={...s,traits:s.traits||{}};if(!T.systems[s.id])T.systems[s.id]={};T.systems[s.id].name=s.name;T.systems[s.id].leader=s.leader;T.systems[s.id].desc=s.description;});
+      const PLANETS={};raw.planets?.forEach(p=>{PLANETS[p.id]={...p};if(!T.planets[p.id])T.planets[p.id]={};T.planets[p.id].name=p.name;T.planets[p.id].desc=p.description;T.planets[p.id].traits=p.traits;T.planets[p.id].quote=p.quote;});
+      const EVENTS=raw.events?.map(e=>({id:e.id,icon:e.icon,system:e.system,title:e.title,desc:e.description,choices:e.choices||[]}))||[];
+      const SECTORS={};raw.sectors?.forEach(s=>{SECTORS[s.id]=s;});
+      const DIFFICULTIES={};raw.difficulties?.forEach(d=>{DIFFICULTIES[d.id]=d;});
+      const LANGUAGES=raw.languages?.map(l=>({code:l.code,name:l.native_name||l.name,flag:l.flag}))||[];
+      return{T,SYSTEMS,PLANETS,EVENTS,SECTORS,DIFFICULTIES,LANGUAGES};
+    };
+
+    // ===== CONTEXTS =====
+    const ContentContext=createContext(null);
+    const StudentContext=createContext(null);
+    const LangContext=createContext(null);
+    const useGameContent=()=>useContext(ContentContext);
+    const useStudent=()=>useContext(StudentContext);
+    const useLang=()=>useContext(LangContext);
+
+    function ContentProvider({children}){
+      const[content,setContent]=useState(FALLBACK_CONTENT);
+      useEffect(()=>{
+        (async()=>{
+          let raw=loadContentFromCache();
+          if(!raw)raw=await loadContentFromDB();
+          if(raw){const transformed=transformContent(raw);if(transformed&&Object.keys(transformed.SYSTEMS||{}).length>0)setContent(transformed);}
+        })();
+      },[]);
+      return(<ContentContext.Provider value={content}>{children}</ContentContext.Provider>);
+    }
+
+    function StudentProvider({children}){
+      const[student,setStudent]=useState(null);
+      const[classroom,setClassroom]=useState(null);
+      const[session,setSession]=useState(null);
+      const[loading,setLoading]=useState(true);
+
+      useEffect(()=>{
+        const saved=localStorage.getItem('school_student');
+        if(saved){
+          try{
+            const data=JSON.parse(saved);
+            setStudent(data.student);
+            setClassroom(data.classroom);
+            setSession(data.session);
+          }catch(e){}
+        }
+        setLoading(false);
+      },[]);
+
+      const login=async(joinCode,displayName,pin)=>{
+        // Find classroom by code
+        const{data:classrooms,error:cErr}=await supabase
+          .from('classrooms')
+          .select('*')
+          .eq('join_code',joinCode.toUpperCase())
+          .eq('is_active',true)
+          .limit(1);
+        
+        if(cErr||!classrooms?.length)throw new Error('Class not found');
+        const classroom=classrooms[0];
+
+        // Find or create student
+        let{data:students,error:sErr}=await supabase
+          .from('students')
+          .select('*')
+          .eq('classroom_id',classroom.id)
+          .eq('display_name',displayName)
+          .limit(1);
+
+        let student;
+        if(students?.length){
+          student=students[0];
+          if(student.pin_code!==pin)throw new Error('Wrong PIN');
+        }else{
+          // Create new student
+          const{data:newStudent,error:createErr}=await supabase
+            .from('students')
+            .insert({classroom_id:classroom.id,display_name:displayName,pin_code:pin})
+            .select()
+            .single();
+          if(createErr)throw new Error('Could not create student');
+          student=newStudent;
+        }
+
+        // Find active session
+        const{data:sessions}=await supabase
+          .from('classroom_sessions')
+          .select('*')
+          .eq('classroom_id',classroom.id)
+          .eq('status','active')
+          .order('started_at',{ascending:false})
+          .limit(1);
+
+        const session=sessions?.[0]||null;
+
+        setStudent(student);
+        setClassroom(classroom);
+        setSession(session);
+        localStorage.setItem('school_student',JSON.stringify({student,classroom,session}));
+      };
+
+      const logout=()=>{
+        setStudent(null);
+        setClassroom(null);
+        setSession(null);
+        localStorage.removeItem('school_student');
+      };
+
+      return(<StudentContext.Provider value={{student,classroom,session,loading,login,logout}}>{children}</StudentContext.Provider>);
+    }
+
+    function LangProvider({children}){
+      const[lang,setLang]=useState(()=>localStorage.getItem('school_lang')||'en');
+      const content=useGameContent();
+      const T=content?.T||FALLBACK_CONTENT.T;
+      const t=useCallback((path)=>{
+        const keys=path.split('.');let val=T;
+        for(const k of keys){val=val?.[k];if(!val)return path;}
+        return val[lang]||val.en||val.ru||path;
+      },[lang,T]);
+      const changeLang=(l)=>{setLang(l);localStorage.setItem('school_lang',l);};
+      return(<LangContext.Provider value={{lang,setLang:changeLang,t}}>{children}</LangContext.Provider>);
+    }
+
+    // ===== UI COMPONENTS =====
+    const Spinner=()=>(<div className="flex justify-center py-8"><div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/></div>);
+    const Toast=({message,type='info',onClose})=>{useEffect(()=>{const t=setTimeout(onClose,3000);return()=>clearTimeout(t);},[onClose]);const colors={success:'bg-green-900/90 border-green-500',error:'bg-red-900/90 border-red-500',info:'bg-blue-900/90 border-blue-500'};return(<div className={`toast ${colors[type]} border px-4 py-3 rounded-lg shadow-lg text-white`}>{message}</div>);};
+    const StarBackground=()=>{const stars=useMemo(()=>Array.from({length:40},(_,i)=>({id:i,left:Math.random()*100,top:Math.random()*100,size:Math.random()*2+1,delay:Math.random()*3})),[]);return(<div className="star-bg">{stars.map(s=>(<div key={s.id} className="star animate-pulse" style={{left:`${s.left}%`,top:`${s.top}%`,width:s.size,height:s.size,animationDelay:`${s.delay}s`}}/>))}</div>);};
+
+    // ===== LOGIN SCREEN =====
+    function LoginScreen(){
+      const{t}=useLang();
+      const{login}=useStudent();
+      const[joinCode,setJoinCode]=useState('');
+      const[displayName,setDisplayName]=useState('');
+      const[pin,setPin]=useState('');
+      const[error,setError]=useState('');
+      const[loading,setLoading]=useState(false);
+
+      const handleSubmit=async(e)=>{
+        e.preventDefault();
+        if(!joinCode||!displayName||!pin){setError('Please fill all fields');return;}
+        if(pin.length!==4||!/^\d+$/.test(pin)){setError('PIN must be 4 digits');return;}
+        setLoading(true);setError('');
+        try{
+          await login(joinCode.trim(),displayName.trim(),pin);
+        }catch(err){
+          setError(err.message);
+        }
+        setLoading(false);
+      };
+
+      return(<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <StarBackground/>
+        <div className="max-w-sm w-full relative z-10 animate-fadeIn">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
+            <p className="text-blue-300/80 text-sm tracking-widest">SCHOOL EDITION</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-blue-500/30 rounded-2xl p-6 space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('ui.classCode')}</label>
+              <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} 
+                placeholder="MARS-7X2K" maxLength={10}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-xl tracking-widest uppercase focus:border-blue-500 focus:outline-none"/>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('ui.yourName')}</label>
+              <input type="text" value={displayName} onChange={e=>setDisplayName(e.target.value)} 
+                placeholder="Alex" maxLength={20}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"/>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('ui.pin')} (4 digits)</label>
+              <input type="password" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,4))} 
+                placeholder="••••" maxLength={4}
+                className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest focus:border-blue-500 focus:outline-none"/>
+            </div>
+
+            {error&&<p className="text-red-400 text-sm text-center">{error}</p>}
+
+            <button type="submit" disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50">
+              {loading?t('ui.loading'):t('ui.join')} 🚀
+            </button>
+          </form>
+
+          <p className="text-center text-gray-500 text-xs mt-6">
+            Ask your teacher for the class code
+          </p>
+        </div>
+      </div>);
+    }
+
+    // ===== MAIN GAME =====
+    function Game(){
+      const{lang,t}=useLang();
+      const{student,classroom,session,logout}=useStudent();
+      const content=useGameContent();
+      const{T,SYSTEMS,PLANETS,EVENTS,DIFFICULTIES}=content||FALLBACK_CONTENT;
+
+      // Game state
+      const[phase,setPhase]=useState('lobby'); // lobby, playing, event, victory, gameover, reflection
+      const[turn,setTurn]=useState(1);
+      const[maxTurns,setMaxTurns]=useState(12);
+      const[stats,setStats]=useState({happiness:60,wealth:50,stability:70});
+      const[hydrobite,setHydrobite]=useState(100);
+      const[budget,setBudget]=useState({defence:20,education:20,health:20,infra:20,welfare:20});
+      const[system,setSystem]=useState('parliamentary');
+      const[planetId,setPlanetId]=useState('terranova');
+      const[event,setEvent]=useState(null);
+      const[eventQueue,setEventQueue]=useState([]);
+      const[usedEvents,setUsedEvents]=useState([]);
+      const[finalScore,setFinalScore]=useState(0);
+      const[victoryType,setVictoryType]=useState(null);
+      const[decisionsLog,setDecisionsLog]=useState([]);
+      const[reflectionAnswers,setReflectionAnswers]=useState({});
+      const[toast,setToast]=useState(null);
+      const[classLeaderboard,setClassLeaderboard]=useState([]);
+
+      const showToast=(msg,type='info')=>setToast({message:msg,type});
+      const difficulty=DIFFICULTIES.normal||{budgetMod:1,eventMod:1};
+      const sys=SYSTEMS[system]||SYSTEMS.parliamentary;
+      const planet=PLANETS[planetId]||PLANETS.terranova;
+
+      // Load class leaderboard
+      useEffect(()=>{
+        if(!classroom)return;
+        (async()=>{
+          const{data}=await supabase
+            .from('student_results')
+            .select('student_id,final_score,is_victory,students(display_name)')
+            .eq('session_id',session?.id)
+            .order('final_score',{ascending:false})
+            .limit(10);
+          if(data)setClassLeaderboard(data);
+        })();
+      },[classroom,session,phase]);
+
+      const startGame=useCallback(()=>{
+        const p=PLANETS[planetId];
+        setStats({happiness:p?.stats?.happiness||60,wealth:p?.stats?.wealth||50,stability:p?.stats?.stability||70});
+        setHydrobite(100);
+        setTurn(1);
+        setUsedEvents([]);
+        setEventQueue([]);
+        setDecisionsLog([]);
+        setPhase('playing');
+      },[planetId,PLANETS]);
+
+      const calculateScore=useCallback((s,h,t)=>Math.round((s.happiness+s.wealth+s.stability)*10+h+t*50),[]);
+
+      const endGame=useCallback(async(isVictory,vType,finalStats)=>{
+        const score=calculateScore(finalStats,hydrobite,turn);
+        setFinalScore(score);
+        setVictoryType(vType);
+        setPhase(isVictory?'victory':'gameover');
+
+        // Save result
+        if(student&&session){
+          await supabase.from('student_results').insert({
+            student_id:student.id,
+            session_id:session.id,
+            political_system:system,
+            planet_id:planetId,
+            final_turn:turn,
+            final_score:score,
+            is_victory:isVictory,
+            victory_type:vType,
+            final_happiness:Math.round(finalStats.happiness),
+            final_wealth:Math.round(finalStats.wealth),
+            final_stability:Math.round(finalStats.stability),
+            decisions_log:decisionsLog,
+            completed_at:new Date().toISOString()
+          });
+        }
+      },[calculateScore,hydrobite,turn,student,session,system,planetId,decisionsLog]);
+
+      const checkGameEnd=useCallback((newStats,currentTurn)=>{
+        if(newStats.happiness<=0||newStats.wealth<=0||newStats.stability<=0){
+          const reason=newStats.happiness<=0?'happiness':newStats.wealth<=0?'wealth':'stability';
+          endGame(false,reason,newStats);return true;
+        }
+        if(currentTurn>maxTurns){
+          if(newStats.happiness>=70&&newStats.wealth>=70&&newStats.stability>=70){
+            endGame(true,'utopia',newStats);
+          }else if(newStats.happiness>=60&&newStats.wealth>=60&&newStats.stability>=60){
+            endGame(true,'prosperity',newStats);
+          }else{
+            endGame(true,'survival',newStats);
+          }
+          return true;
+        }
+        return false;
+      },[maxTurns,endGame]);
+
+      const triggerEvent=useCallback(()=>{
+        const available=EVENTS.filter(e=>(e.system==='general'||e.system===system)&&!usedEvents.includes(e.id));
+        if(available.length===0)return false;
+        const ev=available[Math.floor(Math.random()*available.length)];
+        setEvent(ev);
+        setUsedEvents(prev=>[...prev,ev.id]);
+        setPhase('event');
+        return true;
+      },[EVENTS,system,usedEvents]);
+
+      const applyBudgetEffects=useCallback(()=>{
+        const mods=planet?.mods||{happiness:1,wealth:1,stability:1};
+        setStats(prev=>({
+          happiness:Math.min(100,Math.max(0,prev.happiness+(budget.welfare-15)*0.3*mods.happiness+(budget.health-15)*0.2*mods.happiness)),
+          wealth:Math.min(100,Math.max(0,prev.wealth+(budget.infra-15)*0.3*mods.wealth+(budget.education-10)*0.15*mods.wealth)),
+          stability:Math.min(100,Math.max(0,prev.stability+(budget.defence-15)*0.2*mods.stability+(sys.traits?.stabilityBonus||0)*0.1))
+        }));
+      },[budget,planet,sys]);
+
+      const nextTurn=useCallback(()=>{
+        applyBudgetEffects();
+        setHydrobite(h=>Math.max(0,h+20-Object.values(budget).reduce((a,b)=>a+b,0)*0.3));
+        if(!triggerEvent()){
+          const newTurn=turn+1;
+          if(!checkGameEnd(stats,newTurn)){setTurn(newTurn);}
+        }
+      },[applyBudgetEffects,triggerEvent,turn,stats,checkGameEnd,budget]);
+
+      const handleChoice=useCallback((choice)=>{
+        // Log decision
+        setDecisionsLog(prev=>[...prev,{turn,event:event?.id,eventTitle:event?.title?.en,choice:choice.text?.en}]);
+
+        const effects=choice.effects||{};
+        const newStats={
+          happiness:Math.min(100,Math.max(0,stats.happiness+(effects.happiness||0)*difficulty.eventMod)),
+          wealth:Math.min(100,Math.max(0,stats.wealth+(effects.wealth||0)*difficulty.eventMod)),
+          stability:Math.min(100,Math.max(0,stats.stability+(effects.stability||0)*difficulty.eventMod))
+        };
+        setStats(newStats);
+        setHydrobite(h=>Math.max(0,h-(choice.cost||0)+(choice.hydro||0)));
+        
+        if(eventQueue.length>0){
+          const[nextEv,...rest]=eventQueue;
+          setEvent(nextEv);
+          setEventQueue(rest);
+        }else{
+          const newTurn=turn+1;
+          if(!checkGameEnd(newStats,newTurn)){setTurn(newTurn);setEvent(null);setPhase('playing');}
+        }
+      },[stats,difficulty,eventQueue,turn,checkGameEnd,event]);
+
+      const handleBudget=useCallback((sector,val)=>{setBudget(prev=>({...prev,[sector]:Math.max(0,Math.min(50,parseInt(val)||0))}));},[]);
+
+      const goToReflection=()=>setPhase('reflection');
+      
+      const submitReflection=async()=>{
+        if(student&&session){
+          await supabase.from('student_results')
+            .update({reflection_answers:reflectionAnswers})
+            .eq('student_id',student.id)
+            .eq('session_id',session.id)
+            .order('completed_at',{ascending:false})
+            .limit(1);
+        }
+        setPhase('lobby');
+      };
+
+      // ===== RENDERS =====
+
+      // LOBBY
+      if(phase==='lobby'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
+          <div className="max-w-md mx-auto pt-4 relative z-10">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <p className="text-blue-300 font-bold">{student?.display_name}</p>
+                <p className="text-gray-500 text-sm">{classroom?.name}</p>
+              </div>
+              <button onClick={logout} className="text-gray-400 hover:text-white text-sm">Logout</button>
+            </div>
+
+            <div className="text-center mb-6">
+              <h1 className="text-3xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
+              <p className="text-blue-300/60 text-sm">Choose your political system and build your civilisation</p>
+            </div>
+
+            {/* System Selection */}
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🏛️ Political System</label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(SYSTEMS).map(([id,s])=>(<button key={id} onClick={()=>setSystem(id)}
+                  className={`p-3 rounded-lg border text-left transition ${system===id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
+                  <span className="text-2xl">{s.icon}</span>
+                  <p className="text-sm text-white mt-1">{s.name?.[lang]||s.name?.en||id}</p>
+                </button>))}
+              </div>
+            </div>
+
+            {/* Planet Selection */}
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🌍 Planet</label>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(PLANETS).map(([id,p])=>(<button key={id} onClick={()=>setPlanetId(id)}
+                  className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`}>
+                  <span className="text-2xl">{p.icon}</span>
+                </button>))}
+              </div>
+            </div>
+
+            <button onClick={startGame} 
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg mt-4">
+              🚀 {t('ui.play')}
+            </button>
+
+            {/* Class Leaderboard */}
+            {classLeaderboard.length>0&&(<div className="mt-6 bg-slate-800/50 rounded-xl p-4 border border-blue-500/20">
+              <h3 className="text-blue-300 font-bold mb-3">🏆 {t('ui.leaderboard')}</h3>
+              <div className="space-y-2">
+                {classLeaderboard.slice(0,5).map((r,i)=>(<div key={i} className="flex justify-between text-sm">
+                  <span className="text-gray-300">{i+1}. {r.students?.display_name}</span>
+                  <span className={r.is_victory?'text-green-400':'text-gray-500'}>{r.final_score}</span>
+                </div>))}
+              </div>
+            </div>)}
+          </div>
+          {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
+        </div>);
+      }
+
+      // PLAYING
+      if(phase==='playing'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
+          <div className="max-w-md mx-auto relative z-10">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{sys.icon}</span>
+                <span className="text-blue-300 font-bold">{T?.systems?.[system]?.leader?.[lang]||system}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-blue-400 font-display">{t('ui.year')} {turn}/{maxTurns}</span>
+                <p className="text-xs text-gray-500">{T?.planets?.[planetId]?.name?.[lang]||planetId}</p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
+              <div className="mb-2">
+                <div className="flex justify-between text-xs mb-1"><span>😊 {t('ui.happiness')}</span><span className="font-bold">{Math.round(stats.happiness)}%</span></div>
+                <div className="h-2 bg-slate-900 rounded overflow-hidden"><div className="h-full bg-green-500" style={{width:`${stats.happiness}%`}}/></div>
+              </div>
+              <div className="mb-2">
+                <div className="flex justify-between text-xs mb-1"><span>💰 {t('ui.wealth')}</span><span className="font-bold">{Math.round(stats.wealth)}%</span></div>
+                <div className="h-2 bg-slate-900 rounded overflow-hidden"><div className="h-full bg-yellow-500" style={{width:`${stats.wealth}%`}}/></div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs mb-1"><span>⚖️ {t('ui.stability')}</span><span className="font-bold">{Math.round(stats.stability)}%</span></div>
+                <div className="h-2 bg-slate-900 rounded overflow-hidden"><div className="h-full bg-blue-500" style={{width:`${stats.stability}%`}}/></div>
+              </div>
+            </div>
+
+            {/* Budget */}
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
+              <div className="flex justify-between mb-3">
+                <span className="text-gray-400">Budget Allocation</span>
+                <span className="text-blue-400 font-bold">💎 {Math.round(hydrobite)}</span>
+              </div>
+              {['defence','education','health','infra','welfare'].map(s=>(<div key={s} className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="capitalize">{s}</span><span>{budget[s]}%</span>
+                </div>
+                <input type="range" min="0" max="50" value={budget[s]} onChange={e=>handleBudget(s,e.target.value)}
+                  className="w-full bg-slate-700"/>
+              </div>))}
+            </div>
+
+            <button onClick={nextTurn} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold">
+              {t('ui.next')} →
+            </button>
+          </div>
+        </div>);
+      }
+
+      // EVENT
+      if(phase==='event'&&event){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
+          <div className="max-w-md w-full relative z-10 animate-slideUp">
+            <div className="bg-slate-800 rounded-2xl border border-blue-500/30 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-900/50 to-slate-800 p-6 text-center">
+                <span className="text-5xl block mb-2">{event.icon}</span>
+                <h2 className="text-xl font-display font-bold text-blue-400">{event.title?.[lang]||event.title?.en}</h2>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-300 text-center mb-6">{event.desc?.[lang]||event.desc?.en}</p>
+                <div className="space-y-3">
+                  {event.choices?.map((choice,i)=>(<button key={i} onClick={()=>handleChoice(choice)}
+                    className="w-full p-4 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600 hover:border-blue-500/50 rounded-xl text-left transition">
+                    <div className="font-bold text-blue-200">{choice.text?.[lang]||choice.text?.en}</div>
+                    <div className="flex gap-2 mt-2 text-xs">
+                      {Object.entries(choice.effects||{}).map(([k,v])=>(<span key={k} className={v>=0?'text-green-400':'text-red-400'}>
+                        {k==='happiness'?'😊':k==='wealth'?'💰':'⚖️'}{v>=0?'+':''}{v}
+                      </span>))}
+                      {choice.cost>0&&<span className="text-blue-400">-{choice.cost}💎</span>}
+                    </div>
+                  </button>))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>);
+      }
+
+      // VICTORY
+      if(phase==='victory'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
+          <div className="max-w-md w-full text-center relative z-10 animate-slideUp">
+            <div className="bg-gradient-to-b from-blue-900/50 to-slate-800 rounded-2xl border border-blue-500/50 p-8">
+              <span className="text-6xl block mb-4">🏆</span>
+              <h1 className="text-3xl font-display font-bold gold-gradient mb-4">{t('ui.victory')}</h1>
+              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+                <div className="text-4xl font-bold text-blue-400 mb-2">{finalScore}</div>
+                <p className="text-gray-400">{t('ui.score')}</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center"><span className="text-2xl">😊</span><p className="font-bold text-green-400">{Math.round(stats.happiness)}%</p></div>
+                <div className="text-center"><span className="text-2xl">💰</span><p className="font-bold text-yellow-400">{Math.round(stats.wealth)}%</p></div>
+                <div className="text-center"><span className="text-2xl">⚖️</span><p className="font-bold text-blue-400">{Math.round(stats.stability)}%</p></div>
+              </div>
+              <button onClick={goToReflection} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold">
+                {t('ui.reflection')} →
+              </button>
+            </div>
+          </div>
+        </div>);
+      }
+
+      // GAMEOVER
+      if(phase==='gameover'){
+        return(<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
+          <div className="max-w-md w-full text-center relative z-10 animate-slideUp">
+            <div className="bg-gradient-to-b from-red-900/50 to-slate-800 rounded-2xl border border-red-500/50 p-8">
+              <span className="text-6xl block mb-4">💀</span>
+              <h1 className="text-3xl font-display font-bold text-red-400 mb-4">{t('ui.defeat')}</h1>
+              <p className="text-gray-400 mb-6">{t('ui.year')} {turn} / {maxTurns}</p>
+              <button onClick={goToReflection} className="w-full py-4 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-xl font-bold">
+                {t('ui.reflection')} →
+              </button>
+            </div>
+          </div>
+        </div>);
+      }
+
+      // REFLECTION
+      if(phase==='reflection'){
+        const questions=[
+          {id:'q1',text:{en:'Why did you choose this political system?',ru:'Почему ты выбрал эту политическую систему?'}},
+          {id:'q2',text:{en:'What would you do differently next time?',ru:'Что бы ты сделал по-другому в следующий раз?'}},
+          {id:'q3',text:{en:'What did you learn about governing a society?',ru:'Что ты узнал об управлении обществом?'}}
+        ];
+        return(<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
+          <div className="max-w-md mx-auto pt-8 relative z-10">
+            <h2 className="text-2xl font-display font-bold text-blue-400 mb-6 text-center">📝 {t('ui.reflection')}</h2>
+            <div className="space-y-4">
+              {questions.map(q=>(<div key={q.id} className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20">
+                <p className="text-gray-300 mb-2">{q.text[lang]||q.text.en}</p>
+                <textarea value={reflectionAnswers[q.id]||''} onChange={e=>setReflectionAnswers(prev=>({...prev,[q.id]:e.target.value}))}
+                  rows={3} className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"
+                  placeholder="Your answer..."/>
+              </div>))}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={()=>setPhase('lobby')} className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 rounded-xl">{t('ui.skip')}</button>
+              <button onClick={submitReflection} className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-bold">{t('ui.submit')}</button>
+            </div>
+          </div>
+        </div>);
+      }
+
+      return null;
+    }
+
+    // ===== APP =====
+    function App(){
+      const{student,loading}=useStudent();
+      if(loading)return(<div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner/></div>);
+      return student?<Game/>:<LoginScreen/>;
+    }
+
+    // ===== ROOT =====
+    function Root(){
+      return(
+        <ContentProvider>
+          <StudentProvider>
+            <LangProvider>
+              <App/>
+            </LangProvider>
+          </StudentProvider>
+        </ContentProvider>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
+  </script>
+</body>
+</html>

@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Independence - Teacher Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; }
+    .tab-active { border-bottom: 3px solid #3b82f6; color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  <div id="app"></div>
+
+  <script type="module">
+    const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ===== STATE =====
+    let state = {
+      user: null,
+      teacher: null,
+      school: null,
+      loading: true,
+      activeTab: 'classrooms',
+      classrooms: [],
+      selectedClassroom: null,
+      students: [],
+      results: [],
+      sessions: []
+    };
+
+    // ===== AUTH =====
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        state.loading = false;
+        render();
+        return;
+      }
+      
+      state.user = session.user;
+      
+      // Check if user is a teacher
+      const { data: teacher } = await supabase.from('teachers')
+        .select('*, schools(*)')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (!teacher) {
+        state.loading = false;
+        state.error = 'You are not registered as a teacher. Please contact your administrator.';
+        render();
+        return;
+      }
+      
+      state.teacher = teacher;
+      state.school = teacher.schools;
+      state.loading = false;
+      await loadClassrooms();
+      render();
+    }
+
+    async function signIn(email, password) {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      await checkAuth();
+    }
+
+    async function signOut() {
+      await supabase.auth.signOut();
+      state.user = null;
+      state.teacher = null;
+      render();
+    }
+
+    // ===== DATA =====
+    async function loadClassrooms() {
+      const { data, error } = await supabase
+        .from('classrooms')
+        .select('*')
+        .eq('teacher_id', state.user.id)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      state.classrooms = data || [];
+      render();
+    }
+
+    async function createClassroom(name) {
+      // Generate join code
+      const words = ['MARS', 'LUNA', 'NOVA', 'STAR', 'TERRA', 'ORION', 'VEGA', 'ATLAS'];
+      const word = words[Math.floor(Math.random() * words.length)];
+      const code = word + '-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+      
+      const { data, error } = await supabase.from('classrooms').insert({
+        school_id: state.school.id,
+        teacher_id: state.user.id,
+        name: name,
+        join_code: code
+      }).select().single();
+      
+      if (error) {
+        alert('Error creating classroom: ' + error.message);
+        return;
+      }
+      
+      await loadClassrooms();
+    }
+
+    async function deleteClassroom(id) {
+      if (!confirm('Delete this classroom? All student data will be lost.')) return;
+      
+      await supabase.from('classrooms').update({ is_active: false }).eq('id', id);
+      await loadClassrooms();
+      if (state.selectedClassroom?.id === id) {
+        state.selectedClassroom = null;
+      }
+      render();
+    }
+
+    async function selectClassroom(classroom) {
+      state.selectedClassroom = classroom;
+      state.activeTab = 'students';
+      await loadStudents(classroom.id);
+      await loadSessions(classroom.id);
+      render();
+    }
+
+    async function loadStudents(classroomId) {
+      const { data } = await supabase
+        .from('students')
+        .select('*')
+        .eq('classroom_id', classroomId)
+        .eq('is_active', true)
+        .order('display_name');
+      
+      state.students = data || [];
+    }
+
+    async function loadSessions(classroomId) {
+      const { data } = await supabase
+        .from('classroom_sessions')
+        .select('*')
+        .eq('classroom_id', classroomId)
+        .order('started_at', { ascending: false });
+      
+      state.sessions = data || [];
+    }
+
+    async function loadResults(sessionId) {
+      const { data } = await supabase
+        .from('student_results')
+        .select('*, students(display_name)')
+        .eq('session_id', sessionId)
+        .order('final_score', { ascending: false });
+      
+      state.results = data || [];
+      render();
+    }
+
+    async function startSession(classroomId) {
+      // End any active sessions
+      await supabase.from('classroom_sessions')
+        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .eq('classroom_id', classroomId)
+        .eq('status', 'active');
+      
+      // Create new session
+      const { data, error } = await supabase.from('classroom_sessions').insert({
+        classroom_id: classroomId,
+        status: 'active'
+      }).select().single();
+      
+      if (error) {
+        alert('Error starting session: ' + error.message);
+        return;
+      }
+      
+      await loadSessions(classroomId);
+      render();
+    }
+
+    async function endSession(sessionId) {
+      await supabase.from('classroom_sessions')
+        .update({ status: 'completed', ended_at: new Date().toISOString() })
+        .eq('id', sessionId);
+      
+      await loadSessions(state.selectedClassroom.id);
+      render();
+    }
+
+    // ===== RENDER =====
+    function render() {
+      const app = document.getElementById('app');
+      
+      if (state.loading) {
+        app.innerHTML = `
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        `;
+        return;
+      }
+
+      if (state.error) {
+        app.innerHTML = `
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+              <p class="text-red-400 text-xl mb-4">⚠️ ${state.error}</p>
+              <button onclick="location.reload()" class="px-4 py-2 bg-slate-700 rounded hover:bg-slate-600">Refresh</button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      if (!state.user) {
+        app.innerHTML = renderLogin();
+        attachLoginHandler();
+        return;
+      }
+
+      app.innerHTML = `
+        <div class="flex h-screen">
+          ${renderSidebar()}
+          <div class="flex-1 overflow-auto">
+            ${renderHeader()}
+            ${renderContent()}
+          </div>
+        </div>
+      `;
+      
+      attachEventHandlers();
+    }
+
+    function renderLogin() {
+      return `
+        <div class="flex items-center justify-center min-h-screen p-4">
+          <div class="bg-slate-800 p-8 rounded-xl max-w-md w-full">
+            <div class="text-center mb-6">
+              <h1 class="text-2xl font-bold text-blue-400 mb-2">🎓 Teacher Dashboard</h1>
+              <p class="text-gray-400">Independence - School Edition</p>
+            </div>
+            <form id="loginForm" class="space-y-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Email</label>
+                <input type="email" id="email" required 
+                  class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">Password</label>
+                <input type="password" id="password" required 
+                  class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none">
+              </div>
+              <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold">
+                Sign In
+              </button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSidebar() {
+      return `
+        <div class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
+          <div class="p-4 border-b border-slate-700">
+            <h1 class="text-xl font-bold text-blue-400">🎓 Teacher</h1>
+            <p class="text-sm text-gray-400">${state.school?.name || 'School'}</p>
+          </div>
+          
+          <nav class="flex-1 p-2">
+            <button onclick="switchTab('classrooms')" 
+              class="w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === 'classrooms' ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-slate-700 text-gray-300'}">
+              <span>📚</span> My Classrooms
+            </button>
+            
+            ${state.selectedClassroom ? `
+              <div class="mt-4 pt-4 border-t border-slate-700">
+                <p class="text-xs text-gray-500 px-4 mb-2">SELECTED CLASS</p>
+                <p class="text-blue-300 px-4 font-bold">${state.selectedClassroom.name}</p>
+                <p class="text-xs text-gray-500 px-4 mb-3">Code: ${state.selectedClassroom.join_code}</p>
+                
+                <button onclick="switchTab('students')" 
+                  class="w-full text-left px-4 py-2 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === 'students' ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-slate-700 text-gray-300'}">
+                  <span>👥</span> Students
+                </button>
+                <button onclick="switchTab('sessions')" 
+                  class="w-full text-left px-4 py-2 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === 'sessions' ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-slate-700 text-gray-300'}">
+                  <span>🎮</span> Sessions
+                </button>
+                <button onclick="switchTab('results')" 
+                  class="w-full text-left px-4 py-2 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === 'results' ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-slate-700 text-gray-300'}">
+                  <span>📊</span> Results
+                </button>
+              </div>
+            ` : ''}
+          </nav>
+          
+          <div class="p-4 border-t border-slate-700">
+            <p class="text-sm text-gray-400 mb-2">${state.user?.email}</p>
+            <button onclick="handleSignOut()" class="text-sm text-red-400 hover:text-red-300">Sign Out</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHeader() {
+      const titles = {
+        classrooms: '📚 My Classrooms',
+        students: '👥 Students',
+        sessions: '🎮 Game Sessions',
+        results: '📊 Results & Reflections'
+      };
+      
+      return `
+        <div class="p-6 border-b border-slate-700 flex justify-between items-center">
+          <h2 class="text-2xl font-bold">${titles[state.activeTab]}</h2>
+          ${state.activeTab === 'classrooms' ? `
+            <button onclick="showCreateClassroom()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold">
+              + New Classroom
+            </button>
+          ` : ''}
+          ${state.activeTab === 'sessions' && state.selectedClassroom ? `
+            <button onclick="handleStartSession()" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg font-bold">
+              ▶️ Start New Session
+            </button>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderContent() {
+      switch(state.activeTab) {
+        case 'classrooms': return renderClassrooms();
+        case 'students': return renderStudents();
+        case 'sessions': return renderSessions();
+        case 'results': return renderResults();
+        default: return '';
+      }
+    }
+
+    function renderClassrooms() {
+      if (state.classrooms.length === 0) {
+        return `
+          <div class="p-8 text-center text-gray-400">
+            <p class="text-4xl mb-4">📚</p>
+            <p class="mb-4">No classrooms yet</p>
+            <button onclick="showCreateClassroom()" class="px-4 py-2 bg-blue-600 rounded-lg">Create your first classroom</button>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          ${state.classrooms.map(c => `
+            <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-blue-500/50 cursor-pointer transition"
+                 onclick="handleSelectClassroom('${c.id}')">
+              <div class="flex justify-between items-start mb-3">
+                <h3 class="text-lg font-bold text-blue-300">${c.name}</h3>
+                <button onclick="event.stopPropagation(); handleDeleteClassroom('${c.id}')" 
+                  class="text-gray-500 hover:text-red-400">🗑️</button>
+              </div>
+              <div class="bg-slate-900 rounded-lg p-3 mb-3">
+                <p class="text-xs text-gray-500 mb-1">JOIN CODE</p>
+                <p class="text-2xl font-mono text-blue-400 tracking-wider">${c.join_code}</p>
+              </div>
+              <p class="text-xs text-gray-500">Created ${new Date(c.created_at).toLocaleDateString()}</p>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderStudents() {
+      if (!state.selectedClassroom) return '<div class="p-8 text-center text-gray-400">Select a classroom first</div>';
+      
+      if (state.students.length === 0) {
+        return `
+          <div class="p-8 text-center text-gray-400">
+            <p class="text-4xl mb-4">👥</p>
+            <p class="mb-2">No students have joined yet</p>
+            <p class="text-sm">Share this code with your students:</p>
+            <p class="text-3xl font-mono text-blue-400 mt-2">${state.selectedClassroom.join_code}</p>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6">
+          <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-slate-700">
+                <tr>
+                  <th class="text-left p-4">Student</th>
+                  <th class="text-left p-4">Joined</th>
+                  <th class="text-left p-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${state.students.map(s => `
+                  <tr class="border-t border-slate-700">
+                    <td class="p-4">
+                      <span class="text-xl mr-2">${s.avatar || '👤'}</span>
+                      ${s.display_name}
+                    </td>
+                    <td class="p-4 text-gray-400">${new Date(s.created_at).toLocaleDateString()}</td>
+                    <td class="p-4">
+                      <button onclick="resetStudentPin('${s.id}')" class="text-sm text-blue-400 hover:text-blue-300">Reset PIN</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSessions() {
+      if (!state.selectedClassroom) return '<div class="p-8 text-center text-gray-400">Select a classroom first</div>';
+      
+      const activeSessions = state.sessions.filter(s => s.status === 'active');
+      const pastSessions = state.sessions.filter(s => s.status !== 'active');
+
+      return `
+        <div class="p-6 space-y-6">
+          ${activeSessions.length > 0 ? `
+            <div>
+              <h3 class="text-lg font-bold text-green-400 mb-3">🟢 Active Session</h3>
+              ${activeSessions.map(s => `
+                <div class="bg-green-900/30 border border-green-500/50 rounded-xl p-4 flex justify-between items-center">
+                  <div>
+                    <p class="font-bold">Started ${new Date(s.started_at).toLocaleString()}</p>
+                    <p class="text-sm text-gray-400">Students can join with code: ${state.selectedClassroom.join_code}</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button onclick="handleLoadResults('${s.id}')" class="px-3 py-2 bg-blue-600 rounded-lg text-sm">View Results</button>
+                    <button onclick="handleEndSession('${s.id}')" class="px-3 py-2 bg-red-600 rounded-lg text-sm">End Session</button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          ` : `
+            <div class="bg-slate-800 rounded-xl p-6 text-center border border-slate-700">
+              <p class="text-gray-400 mb-4">No active session</p>
+              <button onclick="handleStartSession()" class="px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold">
+                ▶️ Start Game Session
+              </button>
+            </div>
+          `}
+          
+          ${pastSessions.length > 0 ? `
+            <div>
+              <h3 class="text-lg font-bold text-gray-400 mb-3">📁 Past Sessions</h3>
+              <div class="space-y-2">
+                ${pastSessions.map(s => `
+                  <div class="bg-slate-800 border border-slate-700 rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                      <p>${new Date(s.started_at).toLocaleDateString()} - ${new Date(s.started_at).toLocaleTimeString()}</p>
+                      <p class="text-sm text-gray-500">${s.ended_at ? 'Ended ' + new Date(s.ended_at).toLocaleTimeString() : 'No end time'}</p>
+                    </div>
+                    <button onclick="handleLoadResults('${s.id}')" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">
+                      View Results
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderResults() {
+      if (state.results.length === 0) {
+        return `
+          <div class="p-8 text-center text-gray-400">
+            <p class="text-4xl mb-4">📊</p>
+            <p>Select a session to view results</p>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="p-6">
+          <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+            <table class="w-full">
+              <thead class="bg-slate-700">
+                <tr>
+                  <th class="text-left p-4">#</th>
+                  <th class="text-left p-4">Student</th>
+                  <th class="text-left p-4">System</th>
+                  <th class="text-left p-4">Score</th>
+                  <th class="text-left p-4">Result</th>
+                  <th class="text-left p-4">Stats</th>
+                  <th class="text-left p-4">Reflection</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${state.results.map((r, i) => `
+                  <tr class="border-t border-slate-700">
+                    <td class="p-4 text-gray-500">${i + 1}</td>
+                    <td class="p-4 font-bold">${r.students?.display_name || 'Unknown'}</td>
+                    <td class="p-4">${r.political_system || '-'}</td>
+                    <td class="p-4 text-blue-400 font-bold">${r.final_score || 0}</td>
+                    <td class="p-4">
+                      ${r.is_victory 
+                        ? '<span class="text-green-400">🏆 Victory</span>' 
+                        : '<span class="text-red-400">💀 Defeat</span>'}
+                    </td>
+                    <td class="p-4 text-sm">
+                      <span class="text-green-400">😊${r.final_happiness || 0}%</span>
+                      <span class="text-yellow-400 ml-2">💰${r.final_wealth || 0}%</span>
+                      <span class="text-blue-400 ml-2">⚖️${r.final_stability || 0}%</span>
+                    </td>
+                    <td class="p-4">
+                      ${r.reflection_answers ? `
+                        <button onclick="showReflection('${r.id}')" class="text-blue-400 hover:text-blue-300 text-sm">
+                          View 📝
+                        </button>
+                      ` : '<span class="text-gray-500">-</span>'}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // ===== EVENT HANDLERS =====
+    function attachLoginHandler() {
+      document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        try {
+          await signIn(email, password);
+        } catch (err) {
+          alert('Login error: ' + err.message);
+        }
+      });
+    }
+
+    function attachEventHandlers() {
+      // Event handlers are attached via onclick in HTML
+    }
+
+    window.switchTab = function(tab) {
+      state.activeTab = tab;
+      if (tab === 'results' && state.sessions.length > 0) {
+        const activeSession = state.sessions.find(s => s.status === 'active') || state.sessions[0];
+        loadResults(activeSession.id);
+      }
+      render();
+    };
+
+    window.showCreateClassroom = function() {
+      const name = prompt('Enter classroom name (e.g., "Year 9 Group A"):');
+      if (name) createClassroom(name);
+    };
+
+    window.handleSelectClassroom = function(id) {
+      const classroom = state.classrooms.find(c => c.id === id);
+      if (classroom) selectClassroom(classroom);
+    };
+
+    window.handleDeleteClassroom = function(id) {
+      deleteClassroom(id);
+    };
+
+    window.handleStartSession = function() {
+      if (state.selectedClassroom) startSession(state.selectedClassroom.id);
+    };
+
+    window.handleEndSession = function(id) {
+      if (confirm('End this session?')) endSession(id);
+    };
+
+    window.handleLoadResults = function(sessionId) {
+      state.activeTab = 'results';
+      loadResults(sessionId);
+    };
+
+    window.handleSignOut = function() {
+      signOut();
+    };
+
+    window.showReflection = function(resultId) {
+      const result = state.results.find(r => r.id === resultId);
+      if (!result?.reflection_answers) return;
+      
+      const answers = result.reflection_answers;
+      alert(`Reflection by ${result.students?.display_name}:\n\n` +
+        `Q1: Why this system?\n${answers.q1 || 'No answer'}\n\n` +
+        `Q2: What differently?\n${answers.q2 || 'No answer'}\n\n` +
+        `Q3: What learned?\n${answers.q3 || 'No answer'}`);
+    };
+
+    window.resetStudentPin = async function(studentId) {
+      const newPin = prompt('Enter new 4-digit PIN for student:');
+      if (!newPin || newPin.length !== 4 || !/^\d+$/.test(newPin)) {
+        alert('PIN must be 4 digits');
+        return;
+      }
+      await supabase.from('students').update({ pin_code: newPin }).eq('id', studentId);
+      alert('PIN updated');
+    };
+
+    // ===== INIT =====
+    checkAuth();
+  </script>
+</body>
+</html>
