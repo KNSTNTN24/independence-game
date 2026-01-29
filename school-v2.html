@@ -336,7 +336,7 @@
             const [modeData, setModeData] = React.useState(null);
             const [allEvents, setAllEvents] = React.useState([]);
             const [eventChains, setEventChains] = React.useState([]);
-            const [loading, setLoading] = React.useState(true);
+            const [loading, setLoading] = React.useState(false);
             const [error, setError] = React.useState(null);
 
             // Load game mode data
@@ -1026,16 +1026,20 @@
             const { lang } = useLang();
             const [modes, setModes] = React.useState([]);
             
+            console.log('ModeSelectScreen render, modes:', modes.length, 'loading:', loading);
+            
             React.useEffect(() => {
                 loadModes();
             }, []);
             
             const loadModes = async () => {
-                const { data } = await supabase
+                console.log('loadModes called');
+                const { data, error } = await supabase
                     .from('game_modes')
                     .select('*')
                     .eq('is_active', true)
                     .order('sort_order');
+                console.log('Modes loaded:', data, 'Error:', error);
                 if (data) setModes(data);
             };
             
@@ -1053,7 +1057,10 @@
                             {modes.map(mode => (
                                 <button
                                     key={mode.id}
-                                    onClick={() => loadGameMode(mode.id)}
+                                    onClick={() => {
+                                        console.log('Button clicked! mode.id:', mode.id);
+                                        loadGameMode(mode.id);
+                                    }}
                                     disabled={loading}
                                     className="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 text-left transition-all hover:scale-105"
                                 >
