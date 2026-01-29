@@ -341,15 +341,18 @@
 
             // Load game mode data
             const loadGameMode = async (modeId) => {
+                console.log('loadGameMode called with:', modeId);
                 try {
                     setLoading(true);
                     
                     // Load mode configuration
-                    const { data: mode } = await supabase
+                    const { data: mode, error: modeError } = await supabase
                         .from('game_modes')
                         .select('*')
                         .eq('id', modeId)
                         .single();
+                    
+                    console.log('Mode loaded:', mode, 'Error:', modeError);
                     
                     // Load stats for this mode
                     const { data: stats } = await supabase
@@ -382,16 +385,20 @@
                         .order('priority', { ascending: false });
                     
                     // Load events for this mode
-                    const { data: events } = await supabase
+                    const { data: events, error: eventsError } = await supabase
                         .from('events')
                         .select('*')
                         .contains('game_modes', [modeId]);
                     
+                    console.log('Events query result:', events?.length, 'Error:', eventsError);
+                    
                     // Load event chains
-                    const { data: chains } = await supabase
+                    const { data: chains, error: chainsError } = await supabase
                         .from('event_chains')
                         .select('*')
                         .eq('is_active', true);
+                    
+                    console.log('Chains query result:', chains?.length, 'Error:', chainsError);
                     
                     const data = {
                         mode,
@@ -401,27 +408,37 @@
                         victory_conditions: victoryConditions || []
                     };
                     
+                    console.log('All data loaded:', data);
+                    console.log('Events loaded:', events?.length);
+                    
                     setModeData(data);
                     setAllEvents(events || []);
                     setEventChains(chains || []);
                     
+                    console.log('Dispatching INIT_GAME and SET_PHASE');
                     dispatch({ type: 'INIT_GAME', gameMode: modeId, modeData: data });
                     dispatch({ type: 'SET_PHASE', phase: PHASES.SETUP });
+                    console.log('Dispatch complete');
                     
                 } catch (err) {
                     console.error('Failed to load game mode:', err);
+                    console.error('Error details:', err.message, err.stack);
                     setError(err.message);
                 } finally {
+                    console.log('loadGameMode finally block');
                     setLoading(false);
                 }
             };
 
             // Start game after setup
             const startGame = (options = {}) => {
+                console.log('startGame called with options:', options);
                 if (options.factionId) {
                     dispatch({ type: 'SET_PLAYER_FACTION', factionId: options.factionId });
                 }
+                console.log('Dispatching SET_PHASE to PLAYING');
                 dispatch({ type: 'SET_PHASE', phase: PHASES.PLAYING });
+                console.log('startGame complete');
             };
 
             // Get random event based on conditions
@@ -1065,11 +1082,16 @@
             const { lang } = useLang();
             const [selectedFaction, setSelectedFaction] = React.useState(null);
             
+            console.log('SetupScreen rendered, gameMode:', state.gameMode, 'modeData:', modeData);
+            
             const needsFactionSelect = state.gameMode === 'party' && modeData?.factions?.length > 0;
+            console.log('needsFactionSelect:', needsFactionSelect);
             
             // Auto-start for executive/council modes (no faction selection needed)
             React.useEffect(() => {
+                console.log('SetupScreen useEffect, needsFactionSelect:', needsFactionSelect, 'modeData:', !!modeData);
                 if (!needsFactionSelect && modeData) {
+                    console.log('Calling startGame()');
                     startGame();
                 }
             }, [needsFactionSelect, modeData]);
@@ -1205,6 +1227,8 @@
         // ============================================================================
         function App() {
             const { state } = useGame();
+            
+            console.log('App render, phase:', state.phase);
             
             switch (state.phase) {
                 case PHASES.LOADING:
