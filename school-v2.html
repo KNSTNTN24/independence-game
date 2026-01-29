@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Independence - School Edition v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Custom animations */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .animate-pulse-slow { animation: pulse-slow 2s infinite; }
+        .animate-shake { animation: shake 0.5s ease-in-out; }
+        
+        /* Stat bar styles */
+        .stat-bar {
+            transition: width 0.5s ease-out;
+        }
+        .stat-bar-danger {
+            animation: pulse-slow 1s infinite;
+        }
+        
+        /* Card hover effects */
+        .choice-card {
+            transition: all 0.2s ease;
+        }
+        .choice-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        /* Budget slider custom styling */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #e5e7eb;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // ============================================================================
+        // CONFIGURATION
+        // ============================================================================
+        const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY5NzIzMDAsImV4cCI6MjA1MjU0ODMwMH0.rnZOPOvVQNVNMnIjvHIjIqV78Ilo5bf8s8CKnW_qMDY';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // ============================================================================
+        // LANGUAGE CONTEXT
+        // ============================================================================
+        const LangContext = React.createContext({ lang: 'en', setLang: () => {}, t: () => {} });
+
+        function LangProvider({ children }) {
+            const [lang, setLang] = React.useState('en');
+            const [texts, setTexts] = React.useState({});
+
+            React.useEffect(() => {
+                loadTexts();
+            }, []);
+
+            const loadTexts = async () => {
+                try {
+                    const { data } = await supabase.from('ui_texts').select('key, text');
+                    if (data) {
+                        const textMap = {};
+                        data.forEach(item => {
+                            textMap[item.key] = item.text;
+                        });
+                        setTexts(textMap);
+                    }
+                } catch (err) {
+                    console.error('Failed to load texts:', err);
+                }
+            };
+
+            const t = (key, fallback = key) => {
+                if (texts[key] && texts[key][lang]) {
+                    return texts[key][lang];
+                }
+                return fallback;
+            };
+
+            return (
+                <LangContext.Provider value={{ lang, setLang, t }}>
+                    {children}
+                </LangContext.Provider>
+            );
+        }
+
+        const useLang = () => React.useContext(LangContext);
+
+        // ============================================================================
+        // GAME ENGINE - Core State Machine
+        // ============================================================================
+        const PHASES = {
+            LOADING: 'loading',
+            MODE_SELECT: 'mode_select',
+            SETUP: 'setup',
+            PLAYING: 'playing',
+            EVENT: 'event',
+            CHAIN_REACTION: 'chain_reaction',
+            BUDGET: 'budget',
+            ELECTION: 'election',
+            PARLIAMENT: 'parliament',
+            GAME_OVER: 'game_over',
+            VICTORY: 'victory'
+        };
+
+        // Initial game state factory
+        const createInitialState = (gameMode, modeData) => {
+            const stats = {};
+            const pendingEffects = {}; // For inertia system
+            
+            if (modeData?.stats) {
+                modeData.stats.forEach(stat => {
+                    stats[stat.id] = stat.default_value;
+                    pendingEffects[stat.id] = 0;
+                });
+            }
+
+            const budget = {};
+            if (modeData?.budget_categories) {
+                modeData.budget_categories.forEach(cat => {
+                    budget[cat.id] = cat.default_value;
+                });
+            }
+
+            return {
+                gameMode,
+                phase: PHASES.PLAYING,
+                turn: 1,
+                maxTurns: modeData?.mode?.default_turns || 20,
+                stats,
+                pendingEffects,
+                budget,
+                totalBudget: 75,
+                usedBudget: Object.values(budget).reduce((a, b) => a + b, 0),
+                
+                // Party mode specific
+                playerFaction: null,
+                factionRelations: {},
+                currentBill: null,
+                
+                // Event system
+                currentEvent: null,
+                pendingChainReactions: [],
+                eventHistory: [],
+                usedEventIds: [],
+                
+                // Decision log for educational purposes
+                decisions: [],
+                
+                // Victory tracking
+                victoryConditions: modeData?.victory_conditions || [],
+                defeatReason: null,
+                victoryType: null
+            };
+        };
+
+        // ============================================================================
+        // GAME ENGINE - Reducer
+        // ============================================================================
+        function gameReducer(state, action) {
+            switch (action.type) {
+                case 'SET_PHASE':
+                    return { ...state, phase: action.phase };
+                
+                case 'INIT_GAME':
+                    return createInitialState(action.gameMode, action.modeData);
+                
+                case 'SET_PLAYER_FACTION':
+                    return { ...state, playerFaction: action.factionId };
+                
+                case 'SET_STAT': {
+                    const newStats = { ...state.stats };
+                    newStats[action.statId] = Math.max(0, Math.min(100, action.value));
+                    return { ...state, stats: newStats };
+                }
+                
+                case 'APPLY_EFFECTS': {
+                    const newStats = { ...state.stats };
+                    const newPending = { ...state.pendingEffects };
+                    
+                    Object.entries(action.effects).forEach(([statId, change]) => {
+                        if (newStats.hasOwnProperty(statId)) {
+                            // Apply with inertia if specified
+                            const inertia = action.inertia?.[statId] || 1;
+                            const immediateChange = change * inertia;
+                            const delayedChange = change * (1 - inertia);
+                            
+                            newStats[statId] = Math.max(0, Math.min(100, newStats[statId] + immediateChange));
+                            newPending[statId] = (newPending[statId] || 0) + delayedChange;
+                        }
+                    });
+                    
+                    return { ...state, stats: newStats, pendingEffects: newPending };
+                }
+                
+                case 'APPLY_PENDING_EFFECTS': {
+                    const newStats = { ...state.stats };
+                    const newPending = { ...state.pendingEffects };
+                    
+                    Object.entries(newPending).forEach(([statId, pending]) => {
+                        if (pending !== 0) {
+                            // Apply 20% of pending effects each turn
+                            const apply = pending * 0.2;
+                            newStats[statId] = Math.max(0, Math.min(100, newStats[statId] + apply));
+                            newPending[statId] = pending - apply;
+                            
+                            // Clear tiny remainders
+                            if (Math.abs(newPending[statId]) < 0.1) {
+                                newPending[statId] = 0;
+                            }
+                        }
+                    });
+                    
+                    return { ...state, stats: newStats, pendingEffects: newPending };
+                }
+                
+                case 'SET_BUDGET': {
+                    const newBudget = { ...state.budget, [action.categoryId]: action.value };
+                    const usedBudget = Object.values(newBudget).reduce((a, b) => a + b, 0);
+                    return { ...state, budget: newBudget, usedBudget };
+                }
+                
+                case 'SET_EVENT':
+                    return { ...state, currentEvent: action.event, phase: PHASES.EVENT };
+                
+                case 'CLEAR_EVENT': {
+                    const newUsedIds = action.eventId 
+                        ? [...state.usedEventIds, action.eventId]
+                        : state.usedEventIds;
+                    return { 
+                        ...state, 
+                        currentEvent: null, 
+                        usedEventIds: newUsedIds,
+                        phase: PHASES.PLAYING 
+                    };
+                }
+                
+                case 'ADD_CHAIN_REACTION':
+                    return {
+                        ...state,
+                        pendingChainReactions: [...state.pendingChainReactions, action.chain]
+                    };
+                
+                case 'PROCESS_CHAIN_REACTION': {
+                    const [nextChain, ...remaining] = state.pendingChainReactions;
+                    return {
+                        ...state,
+                        currentEvent: nextChain?.event || null,
+                        pendingChainReactions: remaining,
+                        phase: nextChain ? PHASES.CHAIN_REACTION : PHASES.PLAYING
+                    };
+                }
+                
+                case 'LOG_DECISION':
+                    return {
+                        ...state,
+                        decisions: [...state.decisions, {
+                            turn: state.turn,
+                            event: action.eventTitle,
+                            choice: action.choiceText,
+                            effects: action.effects,
+                            timestamp: new Date().toISOString()
+                        }]
+                    };
+                
+                case 'NEXT_TURN': {
+                    return { ...state, turn: state.turn + 1 };
+                }
+                
+                case 'SET_DEFEAT':
+                    return { ...state, phase: PHASES.GAME_OVER, defeatReason: action.reason };
+                
+                case 'SET_VICTORY':
+                    return { ...state, phase: PHASES.VICTORY, victoryType: action.victoryType };
+                
+                default:
+                    return state;
+            }
+        }
+
+        // ============================================================================
+        // GAME CONTEXT
+        // ============================================================================
+        const GameContext = React.createContext(null);
+
+        function GameProvider({ children }) {
+            const [state, dispatch] = React.useReducer(gameReducer, {
+                phase: PHASES.LOADING,
+                gameMode: null
+            });
+            
+            const [modeData, setModeData] = React.useState(null);
+            const [allEvents, setAllEvents] = React.useState([]);
+            const [eventChains, setEventChains] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            const [error, setError] = React.useState(null);
+
+            // Load game mode data
+            const loadGameMode = async (modeId) => {
+                try {
+                    setLoading(true);
+                    
+                    // Load mode configuration
+                    const { data: mode } = await supabase
+                        .from('game_modes')
+                        .select('*')
+                        .eq('id', modeId)
+                        .single();
+                    
+                    // Load stats for this mode
+                    const { data: stats } = await supabase
+                        .from('stats')
+                        .select('*')
+                        .eq('game_mode', modeId)
+                        .order('sort_order');
+                    
+                    // Load budget categories
+                    const { data: budgetCategories } = await supabase
+                        .from('budget_categories_v2')
+                        .select('*')
+                        .eq('game_mode', modeId)
+                        .order('sort_order');
+                    
+                    // Load factions (for party mode)
+                    const { data: factions } = await supabase
+                        .from('factions')
+                        .select('*')
+                        .eq('game_mode', modeId)
+                        .eq('is_active', true)
+                        .order('sort_order');
+                    
+                    // Load victory conditions
+                    const { data: victoryConditions } = await supabase
+                        .from('victory_conditions')
+                        .select('*')
+                        .eq('game_mode', modeId)
+                        .eq('is_active', true)
+                        .order('priority', { ascending: false });
+                    
+                    // Load events for this mode
+                    const { data: events } = await supabase
+                        .from('events')
+                        .select('*')
+                        .contains('game_modes', [modeId]);
+                    
+                    // Load event chains
+                    const { data: chains } = await supabase
+                        .from('event_chains')
+                        .select('*')
+                        .eq('is_active', true);
+                    
+                    const data = {
+                        mode,
+                        stats: stats || [],
+                        budget_categories: budgetCategories || [],
+                        factions: factions || [],
+                        victory_conditions: victoryConditions || []
+                    };
+                    
+                    setModeData(data);
+                    setAllEvents(events || []);
+                    setEventChains(chains || []);
+                    
+                    dispatch({ type: 'INIT_GAME', gameMode: modeId, modeData: data });
+                    dispatch({ type: 'SET_PHASE', phase: PHASES.SETUP });
+                    
+                } catch (err) {
+                    console.error('Failed to load game mode:', err);
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            // Start game after setup
+            const startGame = (options = {}) => {
+                if (options.factionId) {
+                    dispatch({ type: 'SET_PLAYER_FACTION', factionId: options.factionId });
+                }
+                dispatch({ type: 'SET_PHASE', phase: PHASES.PLAYING });
+            };
+
+            // Get random event based on conditions
+            const getRandomEvent = () => {
+                const validEvents = allEvents.filter(event => {
+                    // Skip used events (unless repeatable)
+                    if (state.usedEventIds.includes(event.id) && !event.is_repeatable) {
+                        return false;
+                    }
+                    
+                    // Skip chain reaction events (they're triggered, not random)
+                    if (event.is_chain_reaction) {
+                        return false;
+                    }
+                    
+                    // Check conditions
+                    if (event.conditions) {
+                        const cond = event.conditions;
+                        if (cond.min_turn && state.turn < cond.min_turn) return false;
+                        if (cond.max_turn && state.turn > cond.max_turn) return false;
+                        
+                        // Check stat conditions
+                        for (const [statId, minVal] of Object.entries(cond.min_stats || {})) {
+                            if (state.stats[statId] < minVal) return false;
+                        }
+                        for (const [statId, maxVal] of Object.entries(cond.max_stats || {})) {
+                            if (state.stats[statId] > maxVal) return false;
+                        }
+                    }
+                    
+                    return true;
+                });
+                
+                if (validEvents.length === 0) return null;
+                
+                // Weight by priority
+                const totalWeight = validEvents.reduce((sum, e) => sum + (e.priority || 50), 0);
+                let random = Math.random() * totalWeight;
+                
+                for (const event of validEvents) {
+                    random -= (event.priority || 50);
+                    if (random <= 0) return event;
+                }
+                
+                return validEvents[0];
+            };
+
+            // Handle player choice in event
+            const handleEventChoice = (choiceIndex) => {
+                const event = state.currentEvent;
+                if (!event || !event.choices) return;
+                
+                const choice = event.choices[choiceIndex];
+                if (!choice) return;
+                
+                // Apply effects
+                if (choice.effects) {
+                    dispatch({ type: 'APPLY_EFFECTS', effects: choice.effects });
+                }
+                
+                // Log decision
+                const { lang } = useLang();
+                dispatch({
+                    type: 'LOG_DECISION',
+                    eventTitle: event.title?.[lang] || event.title?.en || 'Event',
+                    choiceText: choice.text?.[lang] || choice.text?.en || 'Choice',
+                    effects: choice.effects || {}
+                });
+                
+                // Check for chain reactions
+                if (event.is_chain_trigger) {
+                    const chains = eventChains.filter(chain => 
+                        chain.trigger_event_id === event.id && 
+                        chain.trigger_choice_index === choiceIndex
+                    );
+                    
+                    chains.forEach(chain => {
+                        // Check probability
+                        if (Math.random() * 100 < chain.probability) {
+                            const reactionEvent = allEvents.find(e => e.id === chain.response_event_id);
+                            if (reactionEvent) {
+                                dispatch({
+                                    type: 'ADD_CHAIN_REACTION',
+                                    chain: {
+                                        event: reactionEvent,
+                                        type: chain.reaction_type,
+                                        delay: chain.delay_turns
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+                
+                // Clear current event
+                dispatch({ type: 'CLEAR_EVENT', eventId: event.id });
+                
+                // Check for pending chain reactions
+                if (state.pendingChainReactions.length > 0) {
+                    dispatch({ type: 'PROCESS_CHAIN_REACTION' });
+                }
+            };
+
+            // Calculate budget effects on stats
+            const applyBudgetEffects = () => {
+                const effects = {};
+                const inertia = {};
+                
+                modeData?.budget_categories?.forEach(category => {
+                    const value = state.budget[category.id] || 0;
+                    
+                    category.effects?.forEach(effect => {
+                        const baseline = effect.baseline || 15;
+                        const multiplier = effect.multiplier || 0;
+                        const change = (value - baseline) * multiplier;
+                        
+                        effects[effect.stat] = (effects[effect.stat] || 0) + change;
+                        inertia[effect.stat] = effect.inertia || category.effect_inertia || 0.5;
+                    });
+                });
+                
+                dispatch({ type: 'APPLY_EFFECTS', effects, inertia });
+            };
+
+            // Apply natural stat changes per turn
+            const applyNaturalChanges = () => {
+                const effects = {};
+                
+                modeData?.stats?.forEach(stat => {
+                    if (stat.natural_change_per_turn) {
+                        effects[stat.id] = stat.natural_change_per_turn;
+                    }
+                });
+                
+                if (Object.keys(effects).length > 0) {
+                    dispatch({ type: 'APPLY_EFFECTS', effects });
+                }
+            };
+
+            // Check for defeat conditions
+            const checkDefeat = () => {
+                for (const stat of (modeData?.stats || [])) {
+                    if (stat.on_min_action === 'defeat' && state.stats[stat.id] <= stat.min_value) {
+                        const { lang } = useLang();
+                        const message = stat.on_min_message?.[lang] || stat.on_min_message?.en || 'Game Over';
+                        dispatch({ type: 'SET_DEFEAT', reason: message });
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            // Check for victory conditions
+            const checkVictory = () => {
+                for (const condition of (state.victoryConditions || [])) {
+                    let met = false;
+                    
+                    switch (condition.condition_type) {
+                        case 'survive':
+                            if (state.turn >= (condition.check_logic?.turns || state.maxTurns)) {
+                                met = true;
+                            }
+                            break;
+                        case 'stat_threshold':
+                            const logic = condition.check_logic;
+                            const statValue = state.stats[logic?.stat];
+                            if (logic?.operator === '>' && statValue > logic?.value) met = true;
+                            if (logic?.operator === '>=' && statValue >= logic?.value) met = true;
+                            if (logic?.operator === '<' && statValue < logic?.value) met = true;
+                            break;
+                    }
+                    
+                    if (met) {
+                        dispatch({ type: 'SET_VICTORY', victoryType: condition });
+                        return true;
+                    }
+                }
+                return false;
+            };
+
+            // End turn
+            const endTurn = () => {
+                // Apply pending effects (inertia system)
+                dispatch({ type: 'APPLY_PENDING_EFFECTS' });
+                
+                // Apply natural changes
+                applyNaturalChanges();
+                
+                // Check defeat
+                if (checkDefeat()) return;
+                
+                // Check victory
+                if (checkVictory()) return;
+                
+                // Next turn
+                dispatch({ type: 'NEXT_TURN' });
+                
+                // Random event chance (60%)
+                if (Math.random() < 0.6) {
+                    const event = getRandomEvent();
+                    if (event) {
+                        dispatch({ type: 'SET_EVENT', event });
+                    }
+                }
+            };
+
+            // Confirm budget and move to next phase
+            const confirmBudget = () => {
+                applyBudgetEffects();
+                dispatch({ type: 'SET_PHASE', phase: PHASES.PLAYING });
+                endTurn();
+            };
+
+            const value = {
+                state,
+                dispatch,
+                modeData,
+                loading,
+                error,
+                loadGameMode,
+                startGame,
+                handleEventChoice,
+                confirmBudget,
+                endTurn,
+                getRandomEvent
+            };
+
+            return (
+                <GameContext.Provider value={value}>
+                    {children}
+                </GameContext.Provider>
+            );
+        }
+
+        const useGame = () => React.useContext(GameContext);
+
+        // ============================================================================
+        // UI COMPONENTS
+        // ============================================================================
+        
+        // Language Switcher
+        function LanguageSwitcher() {
+            const { lang, setLang } = useLang();
+            return (
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setLang('en')}
+                        className={`px-3 py-1 rounded text-sm ${lang === 'en' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                        EN
+                    </button>
+                    <button
+                        onClick={() => setLang('ru')}
+                        className={`px-3 py-1 rounded text-sm ${lang === 'ru' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
+                    >
+                        RU
+                    </button>
+                </div>
+            );
+        }
+
+        // Stat Bar Component
+        function StatBar({ stat, value }) {
+            const { lang } = useLang();
+            const percentage = Math.max(0, Math.min(100, value));
+            const isDanger = percentage <= 20;
+            const isWarning = percentage <= 40 && percentage > 20;
+            
+            const barColor = isDanger 
+                ? 'bg-red-500' 
+                : isWarning 
+                    ? 'bg-yellow-500' 
+                    : `bg-[${stat.color || '#3B82F6'}]`;
+            
+            return (
+                <div className="mb-3">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="flex items-center gap-2 text-sm font-medium">
+                            <span>{stat.icon}</span>
+                            <span>{stat.name?.[lang] || stat.name?.en || stat.id}</span>
+                        </span>
+                        <span className={`text-sm font-bold ${isDanger ? 'text-red-400' : ''}`}>
+                            {Math.round(value)}%
+                        </span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div 
+                            className={`stat-bar h-full rounded-full transition-all duration-500 ${isDanger ? 'stat-bar-danger bg-red-500' : ''}`}
+                            style={{ 
+                                width: `${percentage}%`,
+                                backgroundColor: !isDanger ? (stat.color || '#3B82F6') : undefined
+                            }}
+                        />
+                    </div>
+                </div>
+            );
+        }
+
+        // Stats Panel
+        function StatsPanel() {
+            const { state, modeData } = useGame();
+            const { lang } = useLang();
+            
+            if (!modeData?.stats) return null;
+            
+            return (
+                <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                        📊 {lang === 'ru' ? 'Показатели' : 'Stats'}
+                    </h3>
+                    {modeData.stats.map(stat => (
+                        <StatBar 
+                            key={stat.id} 
+                            stat={stat} 
+                            value={state.stats[stat.id] || 0} 
+                        />
+                    ))}
+                </div>
+            );
+        }
+
+        // Budget Slider
+        function BudgetSlider({ category, value, onChange, disabled }) {
+            const { lang } = useLang();
+            
+            return (
+                <div className="mb-4">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="flex items-center gap-2">
+                            <span className="text-xl">{category.icon}</span>
+                            <span className="font-medium">
+                                {category.name?.[lang] || category.name?.en || category.id}
+                            </span>
+                        </span>
+                        <span className="font-bold text-lg" style={{ color: category.color }}>
+                            {value}
+                        </span>
+                    </div>
+                    <input
+                        type="range"
+                        min={category.min_value || 0}
+                        max={category.max_value || 50}
+                        value={value}
+                        onChange={(e) => onChange(parseInt(e.target.value))}
+                        disabled={disabled}
+                        className="w-full"
+                        style={{ accentColor: category.color }}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                        {category.description?.[lang] || category.description?.en}
+                    </p>
+                </div>
+            );
+        }
+
+        // Budget Panel
+        function BudgetPanel() {
+            const { state, dispatch, modeData, confirmBudget } = useGame();
+            const { lang } = useLang();
+            
+            if (!modeData?.budget_categories) return null;
+            
+            const remaining = state.totalBudget - state.usedBudget;
+            const isOverBudget = remaining < 0;
+            
+            return (
+                <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold">
+                            💰 {lang === 'ru' ? 'Бюджет' : 'Budget'}
+                        </h3>
+                        <span className={`font-bold ${isOverBudget ? 'text-red-400' : 'text-green-400'}`}>
+                            {remaining} {lang === 'ru' ? 'осталось' : 'remaining'}
+                        </span>
+                    </div>
+                    
+                    {modeData.budget_categories.map(category => (
+                        <BudgetSlider
+                            key={category.id}
+                            category={category}
+                            value={state.budget[category.id] || 0}
+                            onChange={(value) => dispatch({ 
+                                type: 'SET_BUDGET', 
+                                categoryId: category.id, 
+                                value 
+                            })}
+                            disabled={state.phase !== PHASES.BUDGET}
+                        />
+                    ))}
+                    
+                    {state.phase === PHASES.BUDGET && (
+                        <button
+                            onClick={confirmBudget}
+                            disabled={isOverBudget}
+                            className={`w-full py-3 rounded-lg font-bold mt-4 transition-colors ${
+                                isOverBudget 
+                                    ? 'bg-gray-600 cursor-not-allowed' 
+                                    : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                        >
+                            {lang === 'ru' ? 'Подтвердить бюджет' : 'Confirm Budget'}
+                        </button>
+                    )}
+                </div>
+            );
+        }
+
+        // Event Card
+        function EventCard() {
+            const { state, handleEventChoice } = useGame();
+            const { lang } = useLang();
+            
+            const event = state.currentEvent;
+            if (!event) return null;
+            
+            const isChainReaction = state.phase === PHASES.CHAIN_REACTION;
+            
+            return (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fadeIn">
+                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-6 shadow-2xl">
+                        {isChainReaction && (
+                            <div className="bg-orange-600/20 text-orange-400 px-3 py-1 rounded-full text-sm inline-block mb-3">
+                                ⚡ {lang === 'ru' ? 'Реакция' : 'Reaction'}
+                            </div>
+                        )}
+                        
+                        <h2 className="text-2xl font-bold mb-4">
+                            {event.title?.[lang] || event.title?.en || 'Event'}
+                        </h2>
+                        
+                        <p className="text-gray-300 mb-6 leading-relaxed">
+                            {event.description?.[lang] || event.description?.en}
+                        </p>
+                        
+                        <div className="space-y-3">
+                            {event.choices?.map((choice, index) => {
+                                // Check if choice is available
+                                const isAvailable = !choice.requirements || 
+                                    Object.entries(choice.requirements).every(([stat, minVal]) => 
+                                        state.stats[stat] >= minVal
+                                    );
+                                
+                                return (
+                                    <button
+                                        key={index}
+                                        onClick={() => isAvailable && handleEventChoice(index)}
+                                        disabled={!isAvailable}
+                                        className={`choice-card w-full p-4 rounded-lg text-left transition-all ${
+                                            isAvailable 
+                                                ? 'bg-gray-700 hover:bg-gray-600 cursor-pointer' 
+                                                : 'bg-gray-800 opacity-50 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        <p className="font-medium">
+                                            {choice.text?.[lang] || choice.text?.en}
+                                        </p>
+                                        {choice.effects && (
+                                            <div className="flex gap-2 mt-2 flex-wrap">
+                                                {Object.entries(choice.effects).map(([stat, value]) => (
+                                                    <span 
+                                                        key={stat}
+                                                        className={`text-xs px-2 py-1 rounded ${
+                                                            value > 0 ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
+                                                        }`}
+                                                    >
+                                                        {stat}: {value > 0 ? '+' : ''}{value}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {!isAvailable && choice.requirements && (
+                                            <p className="text-xs text-red-400 mt-2">
+                                                {lang === 'ru' ? 'Требуется: ' : 'Requires: '}
+                                                {Object.entries(choice.requirements).map(([stat, val]) => 
+                                                    `${stat} ≥ ${val}`
+                                                ).join(', ')}
+                                            </p>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Turn Info Header
+        function TurnHeader() {
+            const { state, dispatch } = useGame();
+            const { lang } = useLang();
+            
+            return (
+                <div className="bg-gray-800 rounded-lg p-4 flex justify-between items-center">
+                    <div>
+                        <span className="text-gray-400 text-sm">
+                            {lang === 'ru' ? 'Ход' : 'Turn'}
+                        </span>
+                        <span className="text-2xl font-bold ml-2">
+                            {state.turn} / {state.maxTurns}
+                        </span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => dispatch({ type: 'SET_PHASE', phase: PHASES.BUDGET })}
+                            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors"
+                        >
+                            💰 {lang === 'ru' ? 'Бюджет' : 'Budget'}
+                        </button>
+                        <button
+                            onClick={() => {
+                                const { endTurn } = useGame();
+                                endTurn();
+                            }}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
+                        >
+                            ⏭️ {lang === 'ru' ? 'Следующий ход' : 'Next Turn'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Game Over Screen
+        function GameOverScreen() {
+            const { state } = useGame();
+            const { lang } = useLang();
+            
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-8 text-center animate-fadeIn">
+                        <div className="text-6xl mb-4">💀</div>
+                        <h2 className="text-3xl font-bold text-red-400 mb-4">
+                            {lang === 'ru' ? 'Игра окончена' : 'Game Over'}
+                        </h2>
+                        <p className="text-gray-300 mb-6">
+                            {state.defeatReason}
+                        </p>
+                        <p className="text-gray-400 mb-6">
+                            {lang === 'ru' ? `Вы продержались ${state.turn} ходов` : `You survived ${state.turn} turns`}
+                        </p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors"
+                        >
+                            {lang === 'ru' ? 'Играть снова' : 'Play Again'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Victory Screen
+        function VictoryScreen() {
+            const { state } = useGame();
+            const { lang } = useLang();
+            
+            const victory = state.victoryType;
+            
+            return (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-8 text-center animate-fadeIn">
+                        <div className="text-6xl mb-4">🎉</div>
+                        <h2 className="text-3xl font-bold text-green-400 mb-4">
+                            {victory?.name?.[lang] || victory?.name?.en || (lang === 'ru' ? 'Победа!' : 'Victory!')}
+                        </h2>
+                        <p className="text-gray-300 mb-6">
+                            {victory?.victory_message?.[lang] || victory?.victory_message?.en}
+                        </p>
+                        <p className="text-gray-400 mb-6">
+                            {lang === 'ru' ? `Завершено за ${state.turn} ходов` : `Completed in ${state.turn} turns`}
+                        </p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors"
+                        >
+                            {lang === 'ru' ? 'Играть снова' : 'Play Again'}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Mode Selection Screen
+        function ModeSelectScreen() {
+            const { loadGameMode, loading } = useGame();
+            const { lang } = useLang();
+            const [modes, setModes] = React.useState([]);
+            
+            React.useEffect(() => {
+                loadModes();
+            }, []);
+            
+            const loadModes = async () => {
+                const { data } = await supabase
+                    .from('game_modes')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('sort_order');
+                if (data) setModes(data);
+            };
+            
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="max-w-4xl w-full">
+                        <div className="text-center mb-8">
+                            <h1 className="text-4xl font-bold mb-2">🚀 Independence</h1>
+                            <p className="text-gray-400">
+                                {lang === 'ru' ? 'Выберите режим игры' : 'Select Game Mode'}
+                            </p>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-4">
+                            {modes.map(mode => (
+                                <button
+                                    key={mode.id}
+                                    onClick={() => loadGameMode(mode.id)}
+                                    disabled={loading}
+                                    className="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 text-left transition-all hover:scale-105"
+                                >
+                                    <div className="text-4xl mb-3">{mode.icon}</div>
+                                    <h3 className="text-xl font-bold mb-2">
+                                        {mode.name?.[lang] || mode.name?.en}
+                                    </h3>
+                                    <p className="text-gray-400 text-sm">
+                                        {mode.description?.[lang] || mode.description?.en}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <div className="mt-8 flex justify-center">
+                            <LanguageSwitcher />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Setup Screen (faction selection for party mode, etc.)
+        function SetupScreen() {
+            const { state, modeData, startGame } = useGame();
+            const { lang } = useLang();
+            const [selectedFaction, setSelectedFaction] = React.useState(null);
+            
+            const needsFactionSelect = state.gameMode === 'party' && modeData?.factions?.length > 0;
+            
+            if (!needsFactionSelect) {
+                // Auto-start for executive/council modes
+                React.useEffect(() => {
+                    startGame();
+                }, []);
+                return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+            }
+            
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="max-w-4xl w-full">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold mb-2">
+                                {lang === 'ru' ? 'Выберите вашу партию' : 'Choose Your Party'}
+                            </h1>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                            {modeData.factions.filter(f => f.is_player_option).map(faction => (
+                                <button
+                                    key={faction.id}
+                                    onClick={() => setSelectedFaction(faction.id)}
+                                    className={`rounded-xl p-4 text-left transition-all ${
+                                        selectedFaction === faction.id 
+                                            ? 'ring-2 ring-white bg-gray-700' 
+                                            : 'bg-gray-800 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-3xl">{faction.icon}</span>
+                                        <div>
+                                            <h3 className="font-bold" style={{ color: faction.color }}>
+                                                {faction.name?.[lang] || faction.name?.en}
+                                            </h3>
+                                            <span className="text-xs text-gray-400">
+                                                {faction.default_seats} {lang === 'ru' ? 'мест' : 'seats'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-gray-400 text-sm">
+                                        {faction.description?.[lang] || faction.description?.en}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <div className="flex justify-center">
+                            <button
+                                onClick={() => startGame({ factionId: selectedFaction })}
+                                disabled={!selectedFaction}
+                                className={`px-8 py-3 rounded-lg font-bold transition-colors ${
+                                    selectedFaction 
+                                        ? 'bg-blue-600 hover:bg-blue-700' 
+                                        : 'bg-gray-600 cursor-not-allowed'
+                                }`}
+                            >
+                                {lang === 'ru' ? 'Начать игру' : 'Start Game'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main Game Screen
+        function GameScreen() {
+            const { state, endTurn, dispatch } = useGame();
+            const { lang } = useLang();
+            
+            return (
+                <div className="min-h-screen p-4">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-4">
+                            <h1 className="text-2xl font-bold">🚀 Independence</h1>
+                            <LanguageSwitcher />
+                        </div>
+                        
+                        {/* Turn Header */}
+                        <TurnHeader />
+                        
+                        {/* Main Grid */}
+                        <div className="grid md:grid-cols-3 gap-4 mt-4">
+                            {/* Stats */}
+                            <div className="md:col-span-1">
+                                <StatsPanel />
+                            </div>
+                            
+                            {/* Budget */}
+                            <div className="md:col-span-2">
+                                <BudgetPanel />
+                            </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="mt-4 flex justify-center gap-4">
+                            <button
+                                onClick={() => dispatch({ type: 'SET_PHASE', phase: PHASES.BUDGET })}
+                                className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-bold transition-colors"
+                            >
+                                💰 {lang === 'ru' ? 'Изменить бюджет' : 'Edit Budget'}
+                            </button>
+                            <button
+                                onClick={endTurn}
+                                className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition-colors"
+                            >
+                                ⏭️ {lang === 'ru' ? 'Следующий ход' : 'Next Turn'}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Event Modal */}
+                    {(state.phase === PHASES.EVENT || state.phase === PHASES.CHAIN_REACTION) && (
+                        <EventCard />
+                    )}
+                    
+                    {/* Game Over */}
+                    {state.phase === PHASES.GAME_OVER && <GameOverScreen />}
+                    
+                    {/* Victory */}
+                    {state.phase === PHASES.VICTORY && <VictoryScreen />}
+                </div>
+            );
+        }
+
+        // ============================================================================
+        // MAIN APP
+        // ============================================================================
+        function App() {
+            const { state } = useGame();
+            
+            switch (state.phase) {
+                case PHASES.LOADING:
+                    return (
+                        <div className="min-h-screen flex items-center justify-center">
+                            <div className="text-center">
+                                <div className="text-4xl mb-4 animate-pulse-slow">🚀</div>
+                                <p className="text-gray-400">Loading...</p>
+                            </div>
+                        </div>
+                    );
+                
+                case PHASES.MODE_SELECT:
+                    return <ModeSelectScreen />;
+                
+                case PHASES.SETUP:
+                    return <SetupScreen />;
+                
+                case PHASES.PLAYING:
+                case PHASES.EVENT:
+                case PHASES.CHAIN_REACTION:
+                case PHASES.BUDGET:
+                case PHASES.GAME_OVER:
+                case PHASES.VICTORY:
+                    return <GameScreen />;
+                
+                default:
+                    return <ModeSelectScreen />;
+            }
+        }
+
+        // ============================================================================
+        // RENDER
+        // ============================================================================
+        function Root() {
+            return (
+                <LangProvider>
+                    <GameProvider>
+                        <AppWithPhaseInit />
+                    </GameProvider>
+                </LangProvider>
+            );
+        }
+
+        function AppWithPhaseInit() {
+            const { state, dispatch } = useGame();
+            
+            React.useEffect(() => {
+                // Start at mode selection
+                if (state.phase === PHASES.LOADING) {
+                    dispatch({ type: 'SET_PHASE', phase: PHASES.MODE_SELECT });
+                }
+            }, []);
+            
+            return <App />;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<Root />);
+    </script>
+</body>
+</html>
