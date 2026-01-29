@@ -91,16 +91,26 @@
 
             const loadTexts = async () => {
                 try {
-                    const { data } = await supabase.from('ui_texts').select('key, text');
+                    // Try to load UI texts - structure may vary
+                    const { data, error } = await supabase.from('ui_texts').select('*');
+                    if (error) {
+                        console.warn('Failed to load ui_texts:', error.message);
+                        return;
+                    }
                     if (data) {
                         const textMap = {};
                         data.forEach(item => {
-                            textMap[item.key] = item.text;
+                            // Handle both possible structures: {key, text} or {key, value}
+                            const key = item.key || item.text_key || item.id;
+                            const text = item.text || item.value || item.translations || {};
+                            if (key) {
+                                textMap[key] = typeof text === 'string' ? { en: text, ru: text } : text;
+                            }
                         });
                         setTexts(textMap);
                     }
                 } catch (err) {
-                    console.error('Failed to load texts:', err);
+                    console.warn('UI texts not available:', err);
                 }
             };
 
