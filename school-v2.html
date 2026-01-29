@@ -460,7 +460,7 @@
             };
 
             // Handle player choice in event
-            const handleEventChoice = (choiceIndex) => {
+            const handleEventChoice = (choiceIndex, lang = 'en') => {
                 const event = state.currentEvent;
                 if (!event || !event.choices) return;
                 
@@ -473,7 +473,6 @@
                 }
                 
                 // Log decision
-                const { lang } = useLang();
                 dispatch({
                     type: 'LOG_DECISION',
                     eventTitle: event.title?.[lang] || event.title?.en || 'Event',
@@ -555,8 +554,7 @@
             const checkDefeat = () => {
                 for (const stat of (modeData?.stats || [])) {
                     if (stat.on_min_action === 'defeat' && state.stats[stat.id] <= stat.min_value) {
-                        const { lang } = useLang();
-                        const message = stat.on_min_message?.[lang] || stat.on_min_message?.en || 'Game Over';
+                        const message = stat.on_min_message?.en || 'Game Over';
                         dispatch({ type: 'SET_DEFEAT', reason: message });
                         return true;
                     }
@@ -857,7 +855,7 @@
                                 return (
                                     <button
                                         key={index}
-                                        onClick={() => isAvailable && handleEventChoice(index)}
+                                        onClick={() => isAvailable && handleEventChoice(index, lang)}
                                         disabled={!isAvailable}
                                         className={`choice-card w-full p-4 rounded-lg text-left transition-all ${
                                             isAvailable 
@@ -1059,12 +1057,20 @@
             
             const needsFactionSelect = state.gameMode === 'party' && modeData?.factions?.length > 0;
             
-            if (!needsFactionSelect) {
-                // Auto-start for executive/council modes
-                React.useEffect(() => {
+            // Auto-start for executive/council modes (no faction selection needed)
+            React.useEffect(() => {
+                if (!needsFactionSelect && modeData) {
                     startGame();
-                }, []);
-                return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+                }
+            }, [needsFactionSelect, modeData]);
+            
+            if (!needsFactionSelect) {
+                return <div className="flex items-center justify-center min-h-screen">
+                    <div className="text-center">
+                        <div className="text-4xl mb-4 animate-pulse">🚀</div>
+                        <p className="text-gray-400">{lang === 'ru' ? 'Загрузка...' : 'Loading...'}</p>
+                    </div>
+                </div>;
             }
             
             return (
