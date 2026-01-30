@@ -361,6 +361,47 @@
       );
     };
 
+    // Leaderboard Modal
+    const LeaderboardModal=({onClose})=>{
+      const[leaders,setLeaders]=useState([]);
+      const[loading,setLoading]=useState(true);
+      
+      useEffect(()=>{
+        supabase.from('profiles')
+          .select('id,username,display_name,total_games,total_wins,highest_score')
+          .gt('total_games',0)
+          .order('highest_score',{ascending:false})
+          .limit(20)
+          .then(({data})=>{
+            setLeaders(data||[]);
+            setLoading(false);
+          });
+      },[]);
+      
+      return(
+        <Modal onClose={onClose} title="🏆 Leaderboard">
+          {loading?<Spinner/>:(
+            <div className="space-y-2">
+              {leaders.length===0?(
+                <p className="text-center text-gray-400 py-8">No results yet</p>
+              ):leaders.map((p,i)=>(
+                <div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg ${i<3?'bg-gradient-to-r from-amber-900/40 to-transparent':'bg-slate-700/30'}`}>
+                  <span className="text-xl font-bold w-8 text-center">
+                    {i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`}
+                  </span>
+                  <div className="flex-1">
+                    <p className="font-bold text-amber-100 truncate">{p.display_name||p.username||'Player'}</p>
+                    <p className="text-xs text-gray-400">{p.total_wins}/{p.total_games} wins</p>
+                  </div>
+                  <p className="text-lg font-bold text-amber-400">{p.highest_score}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      );
+    };
+
     const StatBar=({stat,value,lang})=>{
       const pct=Math.min(100,Math.max(0,value));
       const color=value<20?'#EF4444':value<40?'#F59E0B':stat.color||'#22C55E';
@@ -419,6 +460,7 @@
       const[showAuth,setShowAuth]=useState(false);
       const[showProfile,setShowProfile]=useState(false);
       const[showPremium,setShowPremium]=useState(false);
+      const[showLeaderboard,setShowLeaderboard]=useState(false);
 
       // State
       const[phase,setPhase]=useState('lang');
@@ -504,7 +546,9 @@
       const checkEnd=useCallback((newStats,newTurn)=>{
         for(const s of modeStats){
           if(s.on_min_action==='defeat'&&newStats[s.id]<=0){
-            setScore(Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length));
+            const finalScore=Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length);
+            setScore(finalScore);
+            saveGameResult(finalScore,false);
             setPhase('gameover');
             return true;
           }
@@ -512,12 +556,26 @@
         if(newTurn>maxTurns){
           const avg=Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length);
           const allGood=modeStats.every(s=>newStats[s.id]>=50);
-          setScore(avg+newTurn*2+(allGood?20:0));
+          const finalScore=avg+newTurn*2+(allGood?20:0);
+          setScore(finalScore);
+          saveGameResult(finalScore,allGood);
           setPhase(allGood?'victory':'gameover');
           return true;
         }
         return false;
-      },[modeStats,maxTurns]);
+      },[modeStats,maxTurns,user,profile]);
+
+      const saveGameResult=async(finalScore,isWin)=>{
+        if(!user||!profile)return;
+        try{
+          const updates={
+            total_games:(profile.total_games||0)+1,
+            total_wins:(profile.total_wins||0)+(isWin?1:0),
+            highest_score:Math.max(profile.highest_score||0,finalScore)
+          };
+          await supabase.from('profiles').update(updates).eq('id',user.id);
+        }catch(e){console.error('Save error:',e);}
+      };
 
       const processTurn=useCallback(()=>{
         if(remaining<0){showToast('❌ Budget exceeded!','error');return;}
@@ -573,6 +631,7 @@
         <div className="flex justify-between items-center mb-4">
           <div className="flex gap-2">
             {!isPremium&&<button onClick={()=>setShowPremium(true)} className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg text-sm font-bold">⭐ Premium</button>}
+            <button onClick={()=>setShowLeaderboard(true)} className="px-3 py-2 bg-slate-800/70 hover:bg-slate-700 border border-amber-500/30 rounded-lg text-sm">🏆</button>
           </div>
           {user?(
             <button onClick={()=>setShowProfile(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-full hover:bg-slate-700">
@@ -616,6 +675,7 @@
             {showAuth&&<AuthModal onClose={()=>setShowAuth(false)}/>}
             {showProfile&&<ProfileModal onClose={()=>setShowProfile(false)}/>}
             {showPremium&&<PremiumModal onClose={()=>setShowPremium(false)}/>}
+            {showLeaderboard&&<LeaderboardModal onClose={()=>setShowLeaderboard(false)}/>}
           </div>
         );
       }
