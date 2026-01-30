@@ -1,1300 +1,821 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Independence - School Edition v2</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        /* Custom animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse-slow {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
-        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
-        .animate-pulse-slow { animation: pulse-slow 2s infinite; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
-        
-        /* Stat bar styles */
-        .stat-bar {
-            transition: width 0.5s ease-out;
-        }
-        .stat-bar-danger {
-            animation: pulse-slow 1s infinite;
-        }
-        
-        /* Card hover effects */
-        .choice-card {
-            transition: all 0.2s ease;
-        }
-        .choice-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        
-        /* Budget slider custom styling */
-        input[type="range"] {
-            -webkit-appearance: none;
-            height: 8px;
-            border-radius: 4px;
-            background: #e5e7eb;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #3b82f6;
-            cursor: pointer;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2563eb">
+  <title>Independence - School Edition v2</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Raleway:wght@300;400;600;700&display=swap');
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;font-family:'Raleway',sans-serif;background:#0f172a}
+    .font-display{font-family:'Cinzel',serif}
+    .gold-gradient{background:linear-gradient(180deg,#60a5fa 0%,#2563eb 50%,#1e40af 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    input[type="range"]{-webkit-appearance:none;height:8px;border-radius:4px;background:#334155}
+    input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#60a5fa,#2563eb);cursor:pointer}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    .animate-fadeIn{animation:fadeIn .3s ease-out}.animate-slideUp{animation:slideUp .4s ease-out}.animate-pulse{animation:pulse 2s infinite}
+    button{min-height:44px;cursor:pointer;transition:all .15s}button:active{transform:scale(.97)}
+    .star-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+    .star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;opacity:.5}
+  </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen">
-    <div id="root"></div>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const{useState,useEffect,useCallback,createContext,useContext,useMemo}=React;
 
-    <script type="text/babel">
-        // ============================================================================
-        // CONFIGURATION
-        // ============================================================================
-        const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    // ============================================================================
+    // CONFIGURATION
+    // ============================================================================
+    const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
+    const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+    const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+    // Default languages
+    const DEFAULT_LANGUAGES=[
+      {code:'en',name:'English',flag:'🇬🇧'},
+      {code:'ru',name:'Русский',flag:'🇷🇺'},
+      {code:'de',name:'Deutsch',flag:'🇩🇪'}
+    ];
+
+    // ============================================================================
+    // CONTEXTS
+    // ============================================================================
+    const ContentContext=createContext({});
+    const StudentContext=createContext(null);
+    const LangContext=createContext({lang:'en',setLang:()=>{},t:()=>''});
+
+    // ============================================================================
+    // CONTENT PROVIDER - Loads all game data from Supabase
+    // ============================================================================
+    function ContentProvider({children}){
+      const[content,setContent]=useState({
+        languages:DEFAULT_LANGUAGES,
+        texts:{},
+        systems:{},
+        planets:{},
+        events:[],
+        gameModes:[],
+        stats:{},
+        budgetCategories:{},
+        factions:[]
+      });
+      const[loading,setLoading]=useState(true);
+
+      useEffect(()=>{
+        loadAllContent();
+      },[]);
+
+      const loadAllContent=async()=>{
+        try{
+          // Load all data in parallel
+          const[
+            langsRes,textsRes,systemsRes,planetsRes,eventsRes,
+            modesRes,statsRes,budgetRes,factionsRes
+          ]=await Promise.all([
+            supabase.from('languages').select('*').eq('is_active',true),
+            supabase.from('ui_texts').select('*'),
+            supabase.from('political_systems').select('*').eq('is_active',true).order('sort_order'),
+            supabase.from('planets').select('*').eq('is_active',true).order('sort_order'),
+            supabase.from('events').select('*').eq('is_active',true),
+            supabase.from('game_modes').select('*').eq('is_active',true).order('sort_order'),
+            supabase.from('stats').select('*'),
+            supabase.from('budget_categories_v2').select('*').order('sort_order'),
+            supabase.from('factions').select('*').eq('is_active',true).order('sort_order')
+          ]);
+
+          // Transform texts into nested object
+          const texts={};
+          textsRes.data?.forEach(t=>{
+            const parts=t.key.split('.');
+            if(parts.length>=2){
+              const[cat,...rest]=parts;
+              const key=rest.join('.');
+              if(!texts[cat])texts[cat]={};
+              texts[cat][key]=t.value;
+            }
+          });
+
+          // Transform systems into object
+          const systems={};
+          systemsRes.data?.forEach(s=>{systems[s.id]=s;});
+
+          // Transform planets into object
+          const planets={};
+          planetsRes.data?.forEach(p=>{planets[p.id]=p;});
+
+          // Group stats by game_mode
+          const stats={};
+          statsRes.data?.forEach(s=>{
+            if(!stats[s.game_mode])stats[s.game_mode]=[];
+            stats[s.game_mode].push(s);
+          });
+          // Sort each mode's stats
+          Object.keys(stats).forEach(mode=>{
+            stats[mode].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+          });
+
+          // Group budget categories by game_mode
+          const budgetCategories={};
+          budgetRes.data?.forEach(b=>{
+            if(!budgetCategories[b.game_mode])budgetCategories[b.game_mode]=[];
+            budgetCategories[b.game_mode].push(b);
+          });
+
+          setContent({
+            languages:langsRes.data?.length?langsRes.data.map(l=>({code:l.code,name:l.native_name||l.name,flag:l.flag})):DEFAULT_LANGUAGES,
+            texts,
+            systems,
+            planets,
+            events:eventsRes.data||[],
+            gameModes:modesRes.data||[],
+            stats,
+            budgetCategories,
+            factions:factionsRes.data||[]
+          });
+        }catch(err){
+          console.error('Failed to load content:',err);
+        }finally{
+          setLoading(false);
+        }
+      };
+
+      return<ContentContext.Provider value={{...content,loading,reload:loadAllContent}}>{children}</ContentContext.Provider>;
+    }
+
+    // ============================================================================
+    // LANGUAGE PROVIDER
+    // ============================================================================
+    function LangProvider({children}){
+      const[lang,setLang]=useState(()=>localStorage.getItem('school_lang')||'en');
+      const content=useContext(ContentContext);
+      
+      const t=useCallback((key,fallback='')=>{
+        // Try school.* texts first
+        const val=content?.texts?.school?.[key];
+        if(val&&typeof val==='object'){
+          return val[lang]||val.en||val.ru||fallback||key;
+        }
+        return fallback||key;
+      },[lang,content]);
+
+      const changeLang=(l)=>{setLang(l);localStorage.setItem('school_lang',l);};
+      
+      return<LangContext.Provider value={{lang,setLang:changeLang,t}}>{children}</LangContext.Provider>;
+    }
+
+    // ============================================================================
+    // STUDENT PROVIDER - Handles school authentication
+    // ============================================================================
+    function StudentProvider({children}){
+      const[student,setStudent]=useState(null);
+      const[classroom,setClassroom]=useState(null);
+      const[session,setSession]=useState(null);
+      const[scenario,setScenario]=useState(null);
+      const[loading,setLoading]=useState(true);
+
+      useEffect(()=>{
+        const saved=localStorage.getItem('school_student');
+        if(saved){try{const d=JSON.parse(saved);setStudent(d.student);setClassroom(d.classroom);setSession(d.session);setScenario(d.scenario);}catch(e){}}
+        setLoading(false);
+      },[]);
+
+      const login=async(joinCode,displayName,pin)=>{
+        const{data:classrooms}=await supabase.from('classrooms').select('*').eq('join_code',joinCode.toUpperCase()).eq('is_active',true).limit(1);
+        if(!classrooms?.length)throw new Error('Class not found');
+        const classroom=classrooms[0];
+
+        let{data:students}=await supabase.from('students').select('*').eq('classroom_id',classroom.id).eq('display_name',displayName).limit(1);
+        let student;
+        if(students?.length){
+          student=students[0];
+          if(student.pin_code!==pin)throw new Error('Wrong PIN');
+        }else{
+          const{data:newStudent,error}=await supabase.from('students').insert({classroom_id:classroom.id,display_name:displayName,pin_code:pin}).select().single();
+          if(error)throw new Error('Could not join');
+          student=newStudent;
+        }
+
+        const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroom.id).eq('status','active').order('started_at',{ascending:false}).limit(1);
+        const session=sessions?.[0]||null;
+        const scenario=session?.scenarios||null;
+
+        setStudent(student);setClassroom(classroom);setSession(session);setScenario(scenario);
+        localStorage.setItem('school_student',JSON.stringify({student,classroom,session,scenario}));
+      };
+
+      const logout=()=>{setStudent(null);setClassroom(null);setSession(null);setScenario(null);localStorage.removeItem('school_student');};
+      
+      const refreshSession=async()=>{
+        if(!classroom)return;
+        const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroom.id).eq('status','active').limit(1);
+        const newSession=sessions?.[0]||null;
+        const newScenario=newSession?.scenarios||null;
+        setSession(newSession);setScenario(newScenario);
+        localStorage.setItem('school_student',JSON.stringify({student,classroom,session:newSession,scenario:newScenario}));
+      };
+
+      return<StudentContext.Provider value={{student,classroom,session,scenario,loading,login,logout,refreshSession}}>{children}</StudentContext.Provider>;
+    }
+
+    // ============================================================================
+    // UI COMPONENTS
+    // ============================================================================
+    const StarBackground=()=>{
+      const stars=useMemo(()=>Array.from({length:40},(_,i)=>({
+        id:i,left:Math.random()*100,top:Math.random()*100,size:Math.random()*2+1,delay:Math.random()*3
+      })),[]);
+      return<div className="star-bg">{stars.map(s=>
+        <div key={s.id} className="star animate-pulse" style={{left:`${s.left}%`,top:`${s.top}%`,width:s.size,height:s.size,animationDelay:`${s.delay}s`}}/>
+      )}</div>;
+    };
+
+    function LangSelector(){
+      const{lang,setLang}=useContext(LangContext);
+      const{languages}=useContext(ContentContext);
+      return<div className="flex gap-1">
+        {languages.map(l=><button key={l.code} onClick={()=>setLang(l.code)} className={`text-lg ${lang===l.code?'opacity-100':'opacity-40 hover:opacity-70'}`} title={l.name}>{l.flag}</button>)}
+      </div>;
+    }
+
+    // Stat bar component - works with any stat from DB
+    function StatBar({stat,value,target,lang}){
+      const name=stat.name?.[lang]||stat.name?.en||stat.id;
+      const icon=stat.icon||'📊';
+      const color=stat.color||'#3B82F6';
+      const pct=Math.max(0,Math.min(100,value));
+      const meetsTarget=target?pct>=target:true;
+      
+      return<div className="mb-2">
+        <div className="flex justify-between text-xs mb-1">
+          <span>{icon} {name}</span>
+          <span className={`font-bold ${meetsTarget?'text-green-400':'text-white'}`}>{Math.round(pct)}%</span>
+        </div>
+        <div className="h-2 bg-slate-900 rounded overflow-hidden relative">
+          <div className="h-full transition-all duration-300" style={{width:`${pct}%`,backgroundColor:color}}/>
+          {target&&<div className="absolute top-0 h-full w-0.5 bg-yellow-400" style={{left:`${target}%`}}/>}
+        </div>
+      </div>;
+    }
+
+    // ============================================================================
+    // LOGIN SCREEN
+    // ============================================================================
+    function LoginScreen(){
+      const{login}=useContext(StudentContext);
+      const{t}=useContext(LangContext);
+      const[joinCode,setJoinCode]=useState('');
+      const[displayName,setDisplayName]=useState('');
+      const[pin,setPin]=useState('');
+      const[error,setError]=useState('');
+      const[loading,setLoading]=useState(false);
+
+      const handleSubmit=async(e)=>{
+        e.preventDefault();
+        if(!joinCode||!displayName||!pin){setError(t('fillAllFields','Please fill all fields'));return;}
+        if(pin.length!==4||!/^\d+$/.test(pin)){setError(t('pinMustBe4','PIN must be 4 digits'));return;}
+        setLoading(true);setError('');
+        try{await login(joinCode.trim(),displayName.trim(),pin);}
+        catch(err){setError(err.message);}
+        setLoading(false);
+      };
+
+      return<div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4">
+        <StarBackground/>
+        <div className="max-w-sm w-full relative z-10 animate-fadeIn">
+          <div className="flex justify-end mb-2"><LangSelector/></div>
+          <div className="text-center mb-8">
+            <h1 className="text-4xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
+            <p className="text-blue-300/80 text-sm tracking-widest">SCHOOL EDITION</p>
+          </div>
+          <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-blue-500/30 rounded-2xl p-6 space-y-4">
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('classCode','Class Code')}</label>
+              <input type="text" value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} placeholder="MARS-7X2K" maxLength={10} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-xl tracking-widest uppercase focus:border-blue-500 focus:outline-none"/>
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('yourName','Your Name')}</label>
+              <input type="text" value={displayName} onChange={e=>setDisplayName(e.target.value)} placeholder="Alex" maxLength={20} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white focus:border-blue-500 focus:outline-none"/>
+            </div>
+            <div>
+              <label className="text-sm text-gray-400 block mb-1">{t('pin','PIN')} ({t('pinDigits','4 digits')})</label>
+              <input type="password" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,4))} placeholder="••••" maxLength={4} className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-center text-2xl tracking-widest focus:border-blue-500 focus:outline-none"/>
+            </div>
+            {error&&<p className="text-red-400 text-sm text-center">{error}</p>}
+            <button type="submit" disabled={loading} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50">
+              {loading?t('loading','Loading...'):t('join','Join')} 🚀
+            </button>
+          </form>
+          <p className="text-center text-gray-500 text-xs mt-6">{t('askTeacher','Ask your teacher for the class code')}</p>
+        </div>
+      </div>;
+    }
+
+    // ============================================================================
+    // MAIN GAME
+    // ============================================================================
+    function Game(){
+      const{student,classroom,session,scenario,logout,refreshSession}=useContext(StudentContext);
+      const{systems,planets,events,stats:allStats,budgetCategories:allBudget,texts}=useContext(ContentContext);
+      const{lang,t}=useContext(LangContext);
+
+      // Game mode - default to 'executive'
+      const gameMode='executive';
+      
+      // Get stats and budget for this game mode
+      const modeStats=allStats[gameMode]||[];
+      const modeBudget=allBudget[gameMode]||[];
+
+      // Scenario settings
+      const maxTurns=scenario?.max_turns||12;
+      const targetStats=scenario?.target_stats||{happiness:60,wealth:60,stability:60,health:60};
+
+      // Filter available systems based on scenario
+      const availableSystems=useMemo(()=>{
+        if(!scenario||!scenario.allowed_systems||!scenario.allowed_systems.length)return systems;
+        const filtered={};
+        scenario.allowed_systems.forEach(id=>{if(systems[id])filtered[id]=systems[id];});
+        return Object.keys(filtered).length>0?filtered:systems;
+      },[scenario,systems]);
+
+      // Game state
+      const[phase,setPhase]=useState('lobby');
+      const[turn,setTurn]=useState(1);
+      const[stats,setStats]=useState({});
+      const[budget,setBudget]=useState({});
+      const[system,setSystem]=useState('parliamentary');
+      const[planetId,setPlanetId]=useState('terranova');
+      const[event,setEvent]=useState(null);
+      const[usedEvents,setUsedEvents]=useState([]);
+      const[finalScore,setFinalScore]=useState(0);
+      const[decisionsLog,setDecisionsLog]=useState([]);
+      const[classLeaderboard,setClassLeaderboard]=useState([]);
+
+      // Initialize stats and budget from DB data
+      useEffect(()=>{
+        if(modeStats.length>0){
+          const initialStats={};
+          modeStats.forEach(s=>{initialStats[s.id]=s.default_value||50;});
+          setStats(initialStats);
+        }
+        if(modeBudget.length>0){
+          const initialBudget={};
+          modeBudget.forEach(b=>{initialBudget[b.id]=b.default_value||15;});
+          setBudget(initialBudget);
+        }
+      },[modeStats,modeBudget]);
+
+      // Set default system if current not available
+      useEffect(()=>{
+        const available=Object.keys(availableSystems);
+        if(available.length>0&&!availableSystems[system])setSystem(available[0]);
+      },[availableSystems]);
+
+      const sys=systems[system]||Object.values(systems)[0]||{icon:'🏛️',name:{en:'Democracy'}};
+      const planet=planets[planetId]||Object.values(planets)[0]||{icon:'🌍',name:{en:'Terra Nova'},stats:{happiness:60,wealth:50,stability:70}};
+
+      // Load leaderboard
+      useEffect(()=>{
+        if(!session)return;
+        supabase.from('student_results').select('student_id,final_score,is_victory,students(display_name)')
+          .eq('session_id',session.id).order('final_score',{ascending:false}).limit(10)
+          .then(({data})=>{if(data)setClassLeaderboard(data);});
+      },[session,phase]);
+
+      useEffect(()=>{if(phase==='lobby')refreshSession();},[phase]);
+
+      const startGame=()=>{
+        // Initialize stats from planet
+        const p=planets[planetId];
+        const initialStats={};
+        modeStats.forEach(s=>{
+          // Use planet stats if available, otherwise default
+          initialStats[s.id]=p?.stats?.[s.id]||s.default_value||50;
+        });
+        setStats(initialStats);
+        setTurn(1);
+        setUsedEvents([]);
+        setDecisionsLog([]);
+        setPhase('playing');
+      };
+
+      const calculateScore=(s,t)=>{
+        const statSum=Object.values(s).reduce((a,b)=>a+b,0);
+        return Math.round(statSum*10/Object.keys(s).length+t*50);
+      };
+
+      const endGame=async(isVictory,vType,finalStats)=>{
+        const score=calculateScore(finalStats,turn);
+        setFinalScore(score);
+        setPhase(isVictory?'victory':'gameover');
+        if(student&&session){
+          await supabase.from('student_results').insert({
+            student_id:student.id,session_id:session.id,political_system:system,planet_id:planetId,
+            final_turn:turn,final_score:score,is_victory:isVictory,victory_type:vType,
+            final_happiness:Math.round(finalStats.happiness||0),
+            final_wealth:Math.round(finalStats.wealth||0),
+            final_stability:Math.round(finalStats.stability||0),
+            decisions_log:decisionsLog,completed_at:new Date().toISOString()
+          });
+        }
+      };
+
+      const checkGameEnd=(newStats,currentTurn)=>{
+        // Check for defeat (any stat at 0)
+        for(const stat of modeStats){
+          if(stat.on_min_action==='defeat'&&newStats[stat.id]<=0){
+            endGame(false,stat.id,newStats);
+            return true;
+          }
+        }
+        // Check for end of turns
+        if(currentTurn>maxTurns){
+          // Check if all targets met
+          let allMet=true;
+          for(const[statId,target]of Object.entries(targetStats)){
+            if(newStats[statId]<target)allMet=false;
+          }
+          if(allMet)endGame(true,'utopia',newStats);
+          else if(Object.values(newStats).every(v=>v>=50))endGame(true,'survival',newStats);
+          else endGame(true,'struggle',newStats);
+          return true;
+        }
+        return false;
+      };
+
+      const triggerEvent=()=>{
+        // Filter events for this game mode
+        const modeEvents=events.filter(e=>
+          (!e.game_modes||e.game_modes.includes(gameMode))&&
+          (e.system==='general'||e.system===system)&&
+          !usedEvents.includes(e.id)
+        );
+        if(!modeEvents.length)return false;
+        const ev=modeEvents[Math.floor(Math.random()*modeEvents.length)];
+        setEvent(ev);
+        setUsedEvents(prev=>[...prev,ev.id]);
+        setPhase('event');
+        return true;
+      };
+
+      const applyBudgetEffects=()=>{
+        const newStats={...stats};
         
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // ============================================================================
-        // LANGUAGE CONTEXT
-        // ============================================================================
-        const LangContext = React.createContext({ lang: 'en', setLang: () => {}, t: () => {} });
-
-        function LangProvider({ children }) {
-            const [lang, setLang] = React.useState('en');
-            const [texts, setTexts] = React.useState({});
-
-            React.useEffect(() => {
-                loadTexts();
-            }, []);
-
-            const loadTexts = async () => {
-                try {
-                    // Try to load UI texts - structure may vary
-                    const { data, error } = await supabase.from('ui_texts').select('*');
-                    if (error) {
-                        console.warn('Failed to load ui_texts:', error.message);
-                        return;
-                    }
-                    if (data) {
-                        const textMap = {};
-                        data.forEach(item => {
-                            // Handle both possible structures: {key, text} or {key, value}
-                            const key = item.key || item.text_key || item.id;
-                            const text = item.text || item.value || item.translations || {};
-                            if (key) {
-                                textMap[key] = typeof text === 'string' ? { en: text, ru: text } : text;
-                            }
-                        });
-                        setTexts(textMap);
-                    }
-                } catch (err) {
-                    console.warn('UI texts not available:', err);
-                }
-            };
-
-            const t = (key, fallback = key) => {
-                if (texts[key] && texts[key][lang]) {
-                    return texts[key][lang];
-                }
-                return fallback;
-            };
-
-            return (
-                <LangContext.Provider value={{ lang, setLang, t }}>
-                    {children}
-                </LangContext.Provider>
-            );
-        }
-
-        const useLang = () => React.useContext(LangContext);
-
-        // ============================================================================
-        // GAME ENGINE - Core State Machine
-        // ============================================================================
-        const PHASES = {
-            LOADING: 'loading',
-            MODE_SELECT: 'mode_select',
-            SETUP: 'setup',
-            PLAYING: 'playing',
-            EVENT: 'event',
-            CHAIN_REACTION: 'chain_reaction',
-            BUDGET: 'budget',
-            ELECTION: 'election',
-            PARLIAMENT: 'parliament',
-            GAME_OVER: 'game_over',
-            VICTORY: 'victory'
-        };
-
-        // Initial game state factory
-        const createInitialState = (gameMode, modeData) => {
-            const stats = {};
-            const pendingEffects = {}; // For inertia system
+        // Apply effects from each budget category
+        modeBudget.forEach(category=>{
+          const value=budget[category.id]||0;
+          const effects=category.effects||[];
+          
+          effects.forEach(effect=>{
+            const baseline=effect.baseline||15;
+            const multiplier=effect.multiplier||0;
+            const change=(value-baseline)*multiplier;
             
-            if (modeData?.stats) {
-                modeData.stats.forEach(stat => {
-                    stats[stat.id] = stat.default_value;
-                    pendingEffects[stat.id] = 0;
-                });
+            if(newStats[effect.stat]!==undefined){
+              newStats[effect.stat]=Math.min(100,Math.max(0,newStats[effect.stat]+change));
             }
-
-            const budget = {};
-            if (modeData?.budget_categories) {
-                modeData.budget_categories.forEach(cat => {
-                    budget[cat.id] = cat.default_value;
-                });
-            }
-
-            return {
-                gameMode,
-                phase: PHASES.PLAYING,
-                turn: 1,
-                maxTurns: modeData?.mode?.default_turns || 20,
-                stats,
-                pendingEffects,
-                budget,
-                totalBudget: 75,
-                usedBudget: Object.values(budget).reduce((a, b) => a + b, 0),
-                
-                // Party mode specific
-                playerFaction: null,
-                factionRelations: {},
-                currentBill: null,
-                
-                // Event system
-                currentEvent: null,
-                pendingChainReactions: [],
-                eventHistory: [],
-                usedEventIds: [],
-                
-                // Decision log for educational purposes
-                decisions: [],
-                
-                // Victory tracking
-                victoryConditions: modeData?.victory_conditions || [],
-                defeatReason: null,
-                victoryType: null
-            };
-        };
-
-        // ============================================================================
-        // GAME ENGINE - Reducer
-        // ============================================================================
-        function gameReducer(state, action) {
-            switch (action.type) {
-                case 'SET_PHASE':
-                    return { ...state, phase: action.phase };
-                
-                case 'INIT_GAME':
-                    return createInitialState(action.gameMode, action.modeData);
-                
-                case 'SET_PLAYER_FACTION':
-                    return { ...state, playerFaction: action.factionId };
-                
-                case 'SET_STAT': {
-                    const newStats = { ...state.stats };
-                    newStats[action.statId] = Math.max(0, Math.min(100, action.value));
-                    return { ...state, stats: newStats };
-                }
-                
-                case 'APPLY_EFFECTS': {
-                    const newStats = { ...state.stats };
-                    const newPending = { ...state.pendingEffects };
-                    
-                    Object.entries(action.effects).forEach(([statId, change]) => {
-                        if (newStats.hasOwnProperty(statId)) {
-                            // Apply with inertia if specified
-                            const inertia = action.inertia?.[statId] || 1;
-                            const immediateChange = change * inertia;
-                            const delayedChange = change * (1 - inertia);
-                            
-                            newStats[statId] = Math.max(0, Math.min(100, newStats[statId] + immediateChange));
-                            newPending[statId] = (newPending[statId] || 0) + delayedChange;
-                        }
-                    });
-                    
-                    return { ...state, stats: newStats, pendingEffects: newPending };
-                }
-                
-                case 'APPLY_PENDING_EFFECTS': {
-                    const newStats = { ...state.stats };
-                    const newPending = { ...state.pendingEffects };
-                    
-                    Object.entries(newPending).forEach(([statId, pending]) => {
-                        if (pending !== 0) {
-                            // Apply 20% of pending effects each turn
-                            const apply = pending * 0.2;
-                            newStats[statId] = Math.max(0, Math.min(100, newStats[statId] + apply));
-                            newPending[statId] = pending - apply;
-                            
-                            // Clear tiny remainders
-                            if (Math.abs(newPending[statId]) < 0.1) {
-                                newPending[statId] = 0;
-                            }
-                        }
-                    });
-                    
-                    return { ...state, stats: newStats, pendingEffects: newPending };
-                }
-                
-                case 'SET_BUDGET': {
-                    const newBudget = { ...state.budget, [action.categoryId]: action.value };
-                    const usedBudget = Object.values(newBudget).reduce((a, b) => a + b, 0);
-                    return { ...state, budget: newBudget, usedBudget };
-                }
-                
-                case 'SET_EVENT':
-                    return { ...state, currentEvent: action.event, phase: PHASES.EVENT };
-                
-                case 'CLEAR_EVENT': {
-                    const newUsedIds = action.eventId 
-                        ? [...state.usedEventIds, action.eventId]
-                        : state.usedEventIds;
-                    return { 
-                        ...state, 
-                        currentEvent: null, 
-                        usedEventIds: newUsedIds,
-                        phase: PHASES.PLAYING 
-                    };
-                }
-                
-                case 'ADD_CHAIN_REACTION':
-                    return {
-                        ...state,
-                        pendingChainReactions: [...state.pendingChainReactions, action.chain]
-                    };
-                
-                case 'PROCESS_CHAIN_REACTION': {
-                    const [nextChain, ...remaining] = state.pendingChainReactions;
-                    return {
-                        ...state,
-                        currentEvent: nextChain?.event || null,
-                        pendingChainReactions: remaining,
-                        phase: nextChain ? PHASES.CHAIN_REACTION : PHASES.PLAYING
-                    };
-                }
-                
-                case 'LOG_DECISION':
-                    return {
-                        ...state,
-                        decisions: [...state.decisions, {
-                            turn: state.turn,
-                            event: action.eventTitle,
-                            choice: action.choiceText,
-                            effects: action.effects,
-                            timestamp: new Date().toISOString()
-                        }]
-                    };
-                
-                case 'NEXT_TURN': {
-                    return { ...state, turn: state.turn + 1 };
-                }
-                
-                case 'SET_DEFEAT':
-                    return { ...state, phase: PHASES.GAME_OVER, defeatReason: action.reason };
-                
-                case 'SET_VICTORY':
-                    return { ...state, phase: PHASES.VICTORY, victoryType: action.victoryType };
-                
-                default:
-                    return state;
-            }
-        }
-
-        // ============================================================================
-        // GAME CONTEXT
-        // ============================================================================
-        const GameContext = React.createContext(null);
-
-        function GameProvider({ children }) {
-            const [state, dispatch] = React.useReducer(gameReducer, {
-                phase: PHASES.LOADING,
-                gameMode: null
-            });
-            
-            const [modeData, setModeData] = React.useState(null);
-            const [allEvents, setAllEvents] = React.useState([]);
-            const [eventChains, setEventChains] = React.useState([]);
-            const [loading, setLoading] = React.useState(false);
-            const [error, setError] = React.useState(null);
-
-            // Load game mode data
-            const loadGameMode = async (modeId) => {
-                console.log('loadGameMode called with:', modeId);
-                try {
-                    setLoading(true);
-                    
-                    // Load mode configuration
-                    const { data: mode, error: modeError } = await supabase
-                        .from('game_modes')
-                        .select('*')
-                        .eq('id', modeId)
-                        .single();
-                    
-                    console.log('Mode loaded:', mode, 'Error:', modeError);
-                    
-                    // Load stats for this mode
-                    const { data: stats } = await supabase
-                        .from('stats')
-                        .select('*')
-                        .eq('game_mode', modeId)
-                        .order('sort_order');
-                    
-                    // Load budget categories
-                    const { data: budgetCategories } = await supabase
-                        .from('budget_categories_v2')
-                        .select('*')
-                        .eq('game_mode', modeId)
-                        .order('sort_order');
-                    
-                    // Load factions (for party mode)
-                    const { data: factions } = await supabase
-                        .from('factions')
-                        .select('*')
-                        .eq('game_mode', modeId)
-                        .eq('is_active', true)
-                        .order('sort_order');
-                    
-                    // Load victory conditions
-                    const { data: victoryConditions } = await supabase
-                        .from('victory_conditions')
-                        .select('*')
-                        .eq('game_mode', modeId)
-                        .eq('is_active', true)
-                        .order('priority', { ascending: false });
-                    
-                    // Load events for this mode
-                    const { data: events, error: eventsError } = await supabase
-                        .from('events')
-                        .select('*')
-                        .contains('game_modes', [modeId]);
-                    
-                    console.log('Events query result:', events?.length, 'Error:', eventsError);
-                    
-                    // Load event chains
-                    const { data: chains, error: chainsError } = await supabase
-                        .from('event_chains')
-                        .select('*')
-                        .eq('is_active', true);
-                    
-                    console.log('Chains query result:', chains?.length, 'Error:', chainsError);
-                    
-                    const data = {
-                        mode,
-                        stats: stats || [],
-                        budget_categories: budgetCategories || [],
-                        factions: factions || [],
-                        victory_conditions: victoryConditions || []
-                    };
-                    
-                    console.log('All data loaded:', data);
-                    console.log('Events loaded:', events?.length);
-                    
-                    setModeData(data);
-                    setAllEvents(events || []);
-                    setEventChains(chains || []);
-                    
-                    console.log('Dispatching INIT_GAME and SET_PHASE');
-                    dispatch({ type: 'INIT_GAME', gameMode: modeId, modeData: data });
-                    dispatch({ type: 'SET_PHASE', phase: PHASES.SETUP });
-                    console.log('Dispatch complete');
-                    
-                } catch (err) {
-                    console.error('Failed to load game mode:', err);
-                    console.error('Error details:', err.message, err.stack);
-                    setError(err.message);
-                } finally {
-                    console.log('loadGameMode finally block');
-                    setLoading(false);
-                }
-            };
-
-            // Start game after setup
-            const startGame = (options = {}) => {
-                console.log('startGame called with options:', options);
-                if (options.factionId) {
-                    dispatch({ type: 'SET_PLAYER_FACTION', factionId: options.factionId });
-                }
-                console.log('Dispatching SET_PHASE to PLAYING');
-                dispatch({ type: 'SET_PHASE', phase: PHASES.PLAYING });
-                console.log('startGame complete');
-            };
-
-            // Get random event based on conditions
-            const getRandomEvent = () => {
-                const validEvents = allEvents.filter(event => {
-                    // Skip used events (unless repeatable)
-                    if (state.usedEventIds.includes(event.id) && !event.is_repeatable) {
-                        return false;
-                    }
-                    
-                    // Skip chain reaction events (they're triggered, not random)
-                    if (event.is_chain_reaction) {
-                        return false;
-                    }
-                    
-                    // Check conditions
-                    if (event.conditions) {
-                        const cond = event.conditions;
-                        if (cond.min_turn && state.turn < cond.min_turn) return false;
-                        if (cond.max_turn && state.turn > cond.max_turn) return false;
-                        
-                        // Check stat conditions
-                        for (const [statId, minVal] of Object.entries(cond.min_stats || {})) {
-                            if (state.stats[statId] < minVal) return false;
-                        }
-                        for (const [statId, maxVal] of Object.entries(cond.max_stats || {})) {
-                            if (state.stats[statId] > maxVal) return false;
-                        }
-                    }
-                    
-                    return true;
-                });
-                
-                if (validEvents.length === 0) return null;
-                
-                // Weight by priority
-                const totalWeight = validEvents.reduce((sum, e) => sum + (e.priority || 50), 0);
-                let random = Math.random() * totalWeight;
-                
-                for (const event of validEvents) {
-                    random -= (event.priority || 50);
-                    if (random <= 0) return event;
-                }
-                
-                return validEvents[0];
-            };
-
-            // Handle player choice in event
-            const handleEventChoice = (choiceIndex, lang = 'en') => {
-                const event = state.currentEvent;
-                if (!event || !event.choices) return;
-                
-                const choice = event.choices[choiceIndex];
-                if (!choice) return;
-                
-                // Apply effects
-                if (choice.effects) {
-                    dispatch({ type: 'APPLY_EFFECTS', effects: choice.effects });
-                }
-                
-                // Log decision
-                dispatch({
-                    type: 'LOG_DECISION',
-                    eventTitle: event.title?.[lang] || event.title?.en || 'Event',
-                    choiceText: choice.text?.[lang] || choice.text?.en || 'Choice',
-                    effects: choice.effects || {}
-                });
-                
-                // Check for chain reactions
-                if (event.is_chain_trigger) {
-                    const chains = eventChains.filter(chain => 
-                        chain.trigger_event_id === event.id && 
-                        chain.trigger_choice_index === choiceIndex
-                    );
-                    
-                    chains.forEach(chain => {
-                        // Check probability
-                        if (Math.random() * 100 < chain.probability) {
-                            const reactionEvent = allEvents.find(e => e.id === chain.response_event_id);
-                            if (reactionEvent) {
-                                dispatch({
-                                    type: 'ADD_CHAIN_REACTION',
-                                    chain: {
-                                        event: reactionEvent,
-                                        type: chain.reaction_type,
-                                        delay: chain.delay_turns
-                                    }
-                                });
-                            }
-                        }
-                    });
-                }
-                
-                // Clear current event
-                dispatch({ type: 'CLEAR_EVENT', eventId: event.id });
-                
-                // Check for pending chain reactions
-                if (state.pendingChainReactions.length > 0) {
-                    dispatch({ type: 'PROCESS_CHAIN_REACTION' });
-                }
-            };
-
-            // Calculate budget effects on stats
-            const applyBudgetEffects = () => {
-                const effects = {};
-                const inertia = {};
-                
-                modeData?.budget_categories?.forEach(category => {
-                    const value = state.budget[category.id] || 0;
-                    
-                    category.effects?.forEach(effect => {
-                        const baseline = effect.baseline || 15;
-                        const multiplier = effect.multiplier || 0;
-                        const change = (value - baseline) * multiplier;
-                        
-                        effects[effect.stat] = (effects[effect.stat] || 0) + change;
-                        inertia[effect.stat] = effect.inertia || category.effect_inertia || 0.5;
-                    });
-                });
-                
-                dispatch({ type: 'APPLY_EFFECTS', effects, inertia });
-            };
-
-            // Apply natural stat changes per turn
-            const applyNaturalChanges = () => {
-                const effects = {};
-                
-                modeData?.stats?.forEach(stat => {
-                    if (stat.natural_change_per_turn) {
-                        effects[stat.id] = stat.natural_change_per_turn;
-                    }
-                });
-                
-                if (Object.keys(effects).length > 0) {
-                    dispatch({ type: 'APPLY_EFFECTS', effects });
-                }
-            };
-
-            // Check for defeat conditions
-            const checkDefeat = () => {
-                for (const stat of (modeData?.stats || [])) {
-                    if (stat.on_min_action === 'defeat' && state.stats[stat.id] <= stat.min_value) {
-                        const message = stat.on_min_message?.en || 'Game Over';
-                        dispatch({ type: 'SET_DEFEAT', reason: message });
-                        return true;
-                    }
-                }
-                return false;
-            };
-
-            // Check for victory conditions
-            const checkVictory = () => {
-                for (const condition of (state.victoryConditions || [])) {
-                    let met = false;
-                    
-                    switch (condition.condition_type) {
-                        case 'survive':
-                            if (state.turn >= (condition.check_logic?.turns || state.maxTurns)) {
-                                met = true;
-                            }
-                            break;
-                        case 'stat_threshold':
-                            const logic = condition.check_logic;
-                            const statValue = state.stats[logic?.stat];
-                            if (logic?.operator === '>' && statValue > logic?.value) met = true;
-                            if (logic?.operator === '>=' && statValue >= logic?.value) met = true;
-                            if (logic?.operator === '<' && statValue < logic?.value) met = true;
-                            break;
-                    }
-                    
-                    if (met) {
-                        dispatch({ type: 'SET_VICTORY', victoryType: condition });
-                        return true;
-                    }
-                }
-                return false;
-            };
-
-            // End turn
-            const endTurn = () => {
-                // Apply pending effects (inertia system)
-                dispatch({ type: 'APPLY_PENDING_EFFECTS' });
-                
-                // Apply natural changes
-                applyNaturalChanges();
-                
-                // Check defeat
-                if (checkDefeat()) return;
-                
-                // Check victory
-                if (checkVictory()) return;
-                
-                // Next turn
-                dispatch({ type: 'NEXT_TURN' });
-                
-                // Random event chance (60%)
-                if (Math.random() < 0.6) {
-                    const event = getRandomEvent();
-                    if (event) {
-                        dispatch({ type: 'SET_EVENT', event });
-                    }
-                }
-            };
-
-            // Confirm budget and move to next phase
-            const confirmBudget = () => {
-                applyBudgetEffects();
-                dispatch({ type: 'SET_PHASE', phase: PHASES.PLAYING });
-                endTurn();
-            };
-
-            const value = {
-                state,
-                dispatch,
-                modeData,
-                loading,
-                error,
-                loadGameMode,
-                startGame,
-                handleEventChoice,
-                confirmBudget,
-                endTurn,
-                getRandomEvent
-            };
-
-            return (
-                <GameContext.Provider value={value}>
-                    {children}
-                </GameContext.Provider>
-            );
-        }
-
-        const useGame = () => React.useContext(GameContext);
-
-        // ============================================================================
-        // UI COMPONENTS
-        // ============================================================================
+          });
+        });
         
-        // Language Switcher
-        function LanguageSwitcher() {
-            const { lang, setLang } = useLang();
-            return (
-                <div className="flex gap-2">
-                    <button
-                        onClick={() => setLang('en')}
-                        className={`px-3 py-1 rounded text-sm ${lang === 'en' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                    >
-                        EN
-                    </button>
-                    <button
-                        onClick={() => setLang('ru')}
-                        className={`px-3 py-1 rounded text-sm ${lang === 'ru' ? 'bg-blue-600' : 'bg-gray-700 hover:bg-gray-600'}`}
-                    >
-                        RU
-                    </button>
-                </div>
-            );
-        }
+        setStats(newStats);
+        return newStats;
+      };
 
-        // Stat Bar Component
-        function StatBar({ stat, value }) {
-            const { lang } = useLang();
-            const percentage = Math.max(0, Math.min(100, value));
-            const isDanger = percentage <= 20;
-            const isWarning = percentage <= 40 && percentage > 20;
-            
-            const barColor = isDanger 
-                ? 'bg-red-500' 
-                : isWarning 
-                    ? 'bg-yellow-500' 
-                    : `bg-[${stat.color || '#3B82F6'}]`;
-            
-            return (
-                <div className="mb-3">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="flex items-center gap-2 text-sm font-medium">
-                            <span>{stat.icon}</span>
-                            <span>{stat.name?.[lang] || stat.name?.en || stat.id}</span>
-                        </span>
-                        <span className={`text-sm font-bold ${isDanger ? 'text-red-400' : ''}`}>
-                            {Math.round(value)}%
-                        </span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
-                        <div 
-                            className={`stat-bar h-full rounded-full transition-all duration-500 ${isDanger ? 'stat-bar-danger bg-red-500' : ''}`}
-                            style={{ 
-                                width: `${percentage}%`,
-                                backgroundColor: !isDanger ? (stat.color || '#3B82F6') : undefined
-                            }}
-                        />
-                    </div>
-                </div>
-            );
+      const nextTurn=()=>{
+        const newStats=applyBudgetEffects();
+        if(!triggerEvent()){
+          const newTurn=turn+1;
+          if(!checkGameEnd(newStats,newTurn))setTurn(newTurn);
         }
+      };
 
-        // Stats Panel
-        function StatsPanel() {
-            const { state, modeData } = useGame();
-            const { lang } = useLang();
-            
-            if (!modeData?.stats) return null;
-            
-            return (
-                <div className="bg-gray-800 rounded-lg p-4">
-                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                        📊 {lang === 'ru' ? 'Показатели' : 'Stats'}
-                    </h3>
-                    {modeData.stats.map(stat => (
-                        <StatBar 
-                            key={stat.id} 
-                            stat={stat} 
-                            value={state.stats[stat.id] || 0} 
-                        />
-                    ))}
-                </div>
-            );
+      const handleChoice=(choice)=>{
+        setDecisionsLog(prev=>[...prev,{
+          turn,eventId:event?.id,
+          eventTitle:event?.title?.[lang]||event?.title?.en||'Event',
+          eventIcon:event?.icon||'❓',
+          choice:choice.text?.[lang]||choice.text?.en,
+          effects:choice.effects||{}
+        }]);
+        
+        const effects=choice.effects||{};
+        const newStats={...stats};
+        Object.entries(effects).forEach(([k,v])=>{
+          if(newStats[k]!==undefined){
+            newStats[k]=Math.min(100,Math.max(0,newStats[k]+v));
+          }
+        });
+        setStats(newStats);
+        
+        const newTurn=turn+1;
+        if(!checkGameEnd(newStats,newTurn)){
+          setTurn(newTurn);
+          setEvent(null);
+          setPhase('playing');
         }
+      };
 
-        // Budget Slider
-        function BudgetSlider({ category, value, onChange, disabled }) {
-            const { lang } = useLang();
-            
-            return (
-                <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="flex items-center gap-2">
-                            <span className="text-xl">{category.icon}</span>
-                            <span className="font-medium">
-                                {category.name?.[lang] || category.name?.en || category.id}
-                            </span>
-                        </span>
-                        <span className="font-bold text-lg" style={{ color: category.color }}>
-                            {value}
-                        </span>
-                    </div>
-                    <input
-                        type="range"
-                        min={category.min_value || 0}
-                        max={category.max_value || 50}
-                        value={value}
-                        onChange={(e) => onChange(parseInt(e.target.value))}
-                        disabled={disabled}
-                        className="w-full"
-                        style={{ accentColor: category.color }}
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                        {category.description?.[lang] || category.description?.en}
-                    </p>
-                </div>
-            );
+      // Generate story summary
+      const generateSummary=useCallback(()=>{
+        const sysName=systems[system]?.name?.[lang]||systems[system]?.name?.en||system;
+        const planetName=planets[planetId]?.name?.[lang]||planets[planetId]?.name?.en||planetId;
+        const isVictory=phase==='victory';
+        
+        let summary=`${sysName} (${planetName}) `;
+        
+        if(isVictory){
+          summary+=`${t('summaryGovSuccess','successfully governed for')} ${turn} ${t('summaryYears','years')}. `;
+        }else{
+          // Find which stat failed
+          let failReason='collapse';
+          for(const stat of modeStats){
+            if(stats[stat.id]<=0){
+              failReason=stat.name?.[lang]||stat.name?.en||stat.id;
+              break;
+            }
+          }
+          summary+=`${t('summaryGovCollapse','collapsed after')} ${turn} ${t('summaryYears','years')} ${t('summaryDueTo','due to')} ${failReason}. `;
         }
-
-        // Budget Panel
-        function BudgetPanel() {
-            const { state, dispatch, modeData, confirmBudget } = useGame();
-            const { lang } = useLang();
-            
-            if (!modeData?.budget_categories) return null;
-            
-            const remaining = state.totalBudget - state.usedBudget;
-            const isOverBudget = remaining < 0;
-            
-            return (
-                <div className="bg-gray-800 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold">
-                            💰 {lang === 'ru' ? 'Бюджет' : 'Budget'}
-                        </h3>
-                        <span className={`font-bold ${isOverBudget ? 'text-red-400' : 'text-green-400'}`}>
-                            {remaining} {lang === 'ru' ? 'осталось' : 'remaining'}
-                        </span>
-                    </div>
-                    
-                    {modeData.budget_categories.map(category => (
-                        <BudgetSlider
-                            key={category.id}
-                            category={category}
-                            value={state.budget[category.id] || 0}
-                            onChange={(value) => dispatch({ 
-                                type: 'SET_BUDGET', 
-                                categoryId: category.id, 
-                                value 
-                            })}
-                            disabled={state.phase !== PHASES.BUDGET}
-                        />
-                    ))}
-                    
-                    {state.phase === PHASES.BUDGET && (
-                        <button
-                            onClick={confirmBudget}
-                            disabled={isOverBudget}
-                            className={`w-full py-3 rounded-lg font-bold mt-4 transition-colors ${
-                                isOverBudget 
-                                    ? 'bg-gray-600 cursor-not-allowed' 
-                                    : 'bg-blue-600 hover:bg-blue-700'
-                            }`}
-                        >
-                            {lang === 'ru' ? 'Подтвердить бюджет' : 'Confirm Budget'}
-                        </button>
-                    )}
-                </div>
-            );
+        
+        if(decisionsLog.length>0){
+          summary+=`\n\n${t('summaryKeyMoments','Key moments')}:\n`;
+          decisionsLog.slice(0,5).forEach(d=>{
+            const effectText=Object.entries(d.effects||{}).map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(', ');
+            summary+=`• ${t('year','Year')} ${d.turn}: ${d.eventIcon} ${d.eventTitle} — "${d.choice}"${effectText?' ('+effectText+')':''}\n`;
+          });
         }
+        
+        return summary;
+      },[system,planetId,turn,stats,decisionsLog,phase,systems,planets,modeStats,lang,t]);
 
-        // Event Card
-        function EventCard() {
-            const { state, handleEventChoice } = useGame();
-            const { lang } = useLang();
-            
-            const event = state.currentEvent;
-            if (!event) return null;
-            
-            const isChainReaction = state.phase === PHASES.CHAIN_REACTION;
-            
-            return (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50 animate-fadeIn">
-                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-6 shadow-2xl">
-                        {isChainReaction && (
-                            <div className="bg-orange-600/20 text-orange-400 px-3 py-1 rounded-full text-sm inline-block mb-3">
-                                ⚡ {lang === 'ru' ? 'Реакция' : 'Reaction'}
-                            </div>
-                        )}
-                        
-                        <h2 className="text-2xl font-bold mb-4">
-                            {event.title?.[lang] || event.title?.en || 'Event'}
-                        </h2>
-                        
-                        <p className="text-gray-300 mb-6 leading-relaxed">
-                            {event.description?.[lang] || event.description?.en}
-                        </p>
-                        
-                        <div className="space-y-3">
-                            {event.choices?.map((choice, index) => {
-                                // Check if choice is available
-                                const isAvailable = !choice.requirements || 
-                                    Object.entries(choice.requirements).every(([stat, minVal]) => 
-                                        state.stats[stat] >= minVal
-                                    );
-                                
-                                return (
-                                    <button
-                                        key={index}
-                                        onClick={() => isAvailable && handleEventChoice(index, lang)}
-                                        disabled={!isAvailable}
-                                        className={`choice-card w-full p-4 rounded-lg text-left transition-all ${
-                                            isAvailable 
-                                                ? 'bg-gray-700 hover:bg-gray-600 cursor-pointer' 
-                                                : 'bg-gray-800 opacity-50 cursor-not-allowed'
-                                        }`}
-                                    >
-                                        <p className="font-medium">
-                                            {choice.text?.[lang] || choice.text?.en}
-                                        </p>
-                                        {choice.effects && (
-                                            <div className="flex gap-2 mt-2 flex-wrap">
-                                                {Object.entries(choice.effects).map(([stat, value]) => (
-                                                    <span 
-                                                        key={stat}
-                                                        className={`text-xs px-2 py-1 rounded ${
-                                                            value > 0 ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'
-                                                        }`}
-                                                    >
-                                                        {stat}: {value > 0 ? '+' : ''}{value}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                        {!isAvailable && choice.requirements && (
-                                            <p className="text-xs text-red-400 mt-2">
-                                                {lang === 'ru' ? 'Требуется: ' : 'Requires: '}
-                                                {Object.entries(choice.requirements).map(([stat, val]) => 
-                                                    `${stat} ≥ ${val}`
-                                                ).join(', ')}
-                                            </p>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+      // ========== LOBBY ==========
+      if(phase==='lobby'){
+        return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
+          <div className="max-w-md mx-auto pt-4 relative z-10">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <p className="text-blue-300 font-bold">{student?.display_name}</p>
+                <p className="text-gray-500 text-sm">{classroom?.name}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <LangSelector/>
+                <button onClick={logout} className="text-gray-400 hover:text-white text-sm">{t('logout','Logout')}</button>
+              </div>
+            </div>
+
+            {scenario&&<div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-4">
+              <h3 className="font-bold text-blue-300">{scenario.title?.[lang]||scenario.title?.en||'Scenario'}</h3>
+              <p className="text-sm text-gray-400 mt-1">{scenario.description?.[lang]||scenario.description?.en}</p>
+              <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                <span>⏱️ {scenario.duration_minutes||30} min</span>
+                <span>🔄 {maxTurns} turns</span>
+              </div>
+            </div>}
+
+            {!session&&<div className="bg-yellow-900/30 border border-yellow-500/50 rounded-xl p-4 mb-4 text-center">
+              <p className="text-yellow-400">⏳ {t('waiting','Waiting for teacher to start session...')}</p>
+              <button onClick={refreshSession} className="mt-2 text-sm text-blue-400 underline">{t('refresh','Refresh')}</button>
+            </div>}
+
+            <div className="text-center mb-4">
+              <h1 className="text-3xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
+              <p className="text-gray-400 text-sm">{t('subtitle','Lead a colony to prosperity through your political decisions')}</p>
+            </div>
+
+            {/* How to Play */}
+            <details className="bg-slate-800/30 border border-slate-700 rounded-xl p-4 mb-4">
+              <summary className="text-blue-300 font-bold cursor-pointer">{t('howToPlayTitle','📖 How to Play')}</summary>
+              <div className="mt-3 text-sm text-gray-400 space-y-2">
+                <p><strong className="text-white">🎯</strong> {t('howToPlayGoal','Keep your colony stable while maintaining all stats above target levels.')}</p>
+                <p><strong className="text-white">🏛️</strong> {t('howToPlaySystem','Each political system has unique traits.')}</p>
+                <p><strong className="text-white">💰</strong> {t('howToPlayBudget','Allocate your budget wisely. Each category affects different stats.')}</p>
+                <p><strong className="text-white">⚡</strong> {t('howToPlayEvents','Random events will test your leadership. Your choices have consequences!')}</p>
+                <p><strong className="text-white">💀</strong> {t('howToPlayDefeat','If any stat drops to 0%, your government collapses.')}</p>
+              </div>
+            </details>
+
+            {/* System Selection */}
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🏛️ {t('politicalSystem','Political System')}</label>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(availableSystems).map(([id,s])=>
+                  <button key={id} onClick={()=>setSystem(id)} className={`p-3 rounded-lg border text-left transition ${system===id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
+                    <span className="text-2xl">{s.icon}</span>
+                    <p className="text-sm text-white mt-1">{s.name?.[lang]||s.name?.en||id}</p>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Planet Selection */}
+            <div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🌍 {t('planet','Planet')}</label>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(planets).map(([id,p])=>
+                  <button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={p.name?.[lang]||p.name?.en||id}>
+                    <span className="text-2xl">{p.icon}</span>
+                  </button>
+                )}
+              </div>
+              {planets[planetId]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-white font-bold">{planets[planetId]?.name?.[lang]||planets[planetId]?.name?.en||planetId}</span>
+                  <span className="text-xs text-gray-500">{'⭐'.repeat(planets[planetId]?.difficulty||1)}</span>
                 </div>
-            );
-        }
+                <p className="text-xs text-gray-400">{planets[planetId]?.description?.[lang]||planets[planetId]?.description?.en}</p>
+              </div>}
+            </div>
 
-        // Turn Info Header
-        function TurnHeader() {
-            const { state, dispatch } = useGame();
-            const { lang } = useLang();
-            
-            return (
-                <div className="bg-gray-800 rounded-lg p-4 flex justify-between items-center">
-                    <div>
-                        <span className="text-gray-400 text-sm">
-                            {lang === 'ru' ? 'Ход' : 'Turn'}
-                        </span>
-                        <span className="text-2xl font-bold ml-2">
-                            {state.turn} / {state.maxTurns}
-                        </span>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => dispatch({ type: 'SET_PHASE', phase: PHASES.BUDGET })}
-                            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-medium transition-colors"
-                        >
-                            💰 {lang === 'ru' ? 'Бюджет' : 'Budget'}
-                        </button>
-                        <button
-                            onClick={() => {
-                                const { endTurn } = useGame();
-                                endTurn();
-                            }}
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition-colors"
-                        >
-                            ⏭️ {lang === 'ru' ? 'Следующий ход' : 'Next Turn'}
-                        </button>
-                    </div>
-                </div>
-            );
-        }
+            <button onClick={startGame} disabled={!session} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+              🚀 {t('play','Play')}
+            </button>
 
-        // Game Over Screen
-        function GameOverScreen() {
-            const { state } = useGame();
-            const { lang } = useLang();
-            
-            return (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-8 text-center animate-fadeIn">
-                        <div className="text-6xl mb-4">💀</div>
-                        <h2 className="text-3xl font-bold text-red-400 mb-4">
-                            {lang === 'ru' ? 'Игра окончена' : 'Game Over'}
-                        </h2>
-                        <p className="text-gray-300 mb-6">
-                            {state.defeatReason}
-                        </p>
-                        <p className="text-gray-400 mb-6">
-                            {lang === 'ru' ? `Вы продержались ${state.turn} ходов` : `You survived ${state.turn} turns`}
-                        </p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors"
-                        >
-                            {lang === 'ru' ? 'Играть снова' : 'Play Again'}
-                        </button>
-                    </div>
-                </div>
-            );
-        }
+            {classLeaderboard.length>0&&<div className="mt-6 bg-slate-800/50 rounded-xl p-4 border border-blue-500/20">
+              <h3 className="text-blue-300 font-bold mb-3">🏆 {t('leaderboard','Class Leaderboard')}</h3>
+              <div className="space-y-2">
+                {classLeaderboard.slice(0,5).map((r,i)=>
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-gray-300">{i+1}. {r.students?.display_name}</span>
+                    <span className={r.is_victory?'text-green-400':'text-gray-500'}>{r.final_score}</span>
+                  </div>
+                )}
+              </div>
+            </div>}
+          </div>
+        </div>;
+      }
 
-        // Victory Screen
-        function VictoryScreen() {
-            const { state } = useGame();
-            const { lang } = useLang();
-            
-            const victory = state.victoryType;
-            
-            return (
-                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-                    <div className="bg-gray-800 rounded-xl max-w-lg w-full p-8 text-center animate-fadeIn">
-                        <div className="text-6xl mb-4">🎉</div>
-                        <h2 className="text-3xl font-bold text-green-400 mb-4">
-                            {victory?.name?.[lang] || victory?.name?.en || (lang === 'ru' ? 'Победа!' : 'Victory!')}
-                        </h2>
-                        <p className="text-gray-300 mb-6">
-                            {victory?.victory_message?.[lang] || victory?.victory_message?.en}
-                        </p>
-                        <p className="text-gray-400 mb-6">
-                            {lang === 'ru' ? `Завершено за ${state.turn} ходов` : `Completed in ${state.turn} turns`}
-                        </p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold transition-colors"
-                        >
-                            {lang === 'ru' ? 'Играть снова' : 'Play Again'}
-                        </button>
-                    </div>
-                </div>
-            );
-        }
+      // ========== PLAYING ==========
+      if(phase==='playing'){
+        const totalBudget=Object.values(budget).reduce((a,b)=>a+(b||0),0);
+        
+        return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
+          <div className="max-w-md mx-auto relative z-10">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{sys?.icon||'🏛️'}</span>
+                <span className="text-blue-300 font-bold">{sys?.name?.[lang]||sys?.name?.en||system}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-blue-400 font-display">{t('year','Year')} {turn}/{maxTurns}</span>
+                <p className="text-xs text-gray-500">{planets[planetId]?.name?.[lang]||planetId}</p>
+              </div>
+            </div>
 
-        // Mode Selection Screen
-        function ModeSelectScreen() {
-            const { loadGameMode, loading } = useGame();
-            const { lang } = useLang();
-            const [modes, setModes] = React.useState([]);
-            
-            console.log('ModeSelectScreen render, modes:', modes.length, 'loading:', loading);
-            
-            React.useEffect(() => {
-                loadModes();
-            }, []);
-            
-            const loadModes = async () => {
-                console.log('loadModes called');
-                const { data, error } = await supabase
-                    .from('game_modes')
-                    .select('*')
-                    .eq('is_active', true)
-                    .order('sort_order');
-                console.log('Modes loaded:', data, 'Error:', error);
-                if (data) setModes(data);
-            };
-            
-            return (
-                <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="max-w-4xl w-full">
-                        <div className="text-center mb-8">
-                            <h1 className="text-4xl font-bold mb-2">🚀 Independence</h1>
-                            <p className="text-gray-400">
-                                {lang === 'ru' ? 'Выберите режим игры' : 'Select Game Mode'}
-                            </p>
-                        </div>
-                        
-                        <div className="grid md:grid-cols-3 gap-4">
-                            {modes.map(mode => (
-                                <button
-                                    key={mode.id}
-                                    onClick={() => {
-                                        console.log('Button clicked! mode.id:', mode.id);
-                                        loadGameMode(mode.id);
-                                    }}
-                                    disabled={loading}
-                                    className="bg-gray-800 hover:bg-gray-700 rounded-xl p-6 text-left transition-all hover:scale-105"
-                                >
-                                    <div className="text-4xl mb-3">{mode.icon}</div>
-                                    <h3 className="text-xl font-bold mb-2">
-                                        {mode.name?.[lang] || mode.name?.en}
-                                    </h3>
-                                    <p className="text-gray-400 text-sm">
-                                        {mode.description?.[lang] || mode.description?.en}
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-                        
-                        <div className="mt-8 flex justify-center">
-                            <LanguageSwitcher />
-                        </div>
-                    </div>
-                </div>
-            );
-        }
+            {/* Stats - Dynamic from DB */}
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
+              {modeStats.map(stat=>
+                <StatBar 
+                  key={stat.id} 
+                  stat={stat} 
+                  value={stats[stat.id]||0} 
+                  target={targetStats[stat.id]} 
+                  lang={lang}
+                />
+              )}
+            </div>
 
-        // Setup Screen (faction selection for party mode, etc.)
-        function SetupScreen() {
-            const { state, modeData, startGame } = useGame();
-            const { lang } = useLang();
-            const [selectedFaction, setSelectedFaction] = React.useState(null);
-            
-            console.log('SetupScreen rendered, gameMode:', state.gameMode, 'modeData:', modeData);
-            
-            const needsFactionSelect = state.gameMode === 'party' && modeData?.factions?.length > 0;
-            console.log('needsFactionSelect:', needsFactionSelect);
-            
-            // Auto-start for executive/council modes (no faction selection needed)
-            React.useEffect(() => {
-                console.log('SetupScreen useEffect, needsFactionSelect:', needsFactionSelect, 'modeData:', !!modeData);
-                if (!needsFactionSelect && modeData) {
-                    console.log('Calling startGame()');
-                    startGame();
-                }
-            }, [needsFactionSelect, modeData]);
-            
-            if (!needsFactionSelect) {
-                return <div className="flex items-center justify-center min-h-screen">
-                    <div className="text-center">
-                        <div className="text-4xl mb-4 animate-pulse">🚀</div>
-                        <p className="text-gray-400">{lang === 'ru' ? 'Загрузка...' : 'Loading...'}</p>
-                    </div>
+            {/* Budget - Dynamic from DB */}
+            <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-gray-400">{t('budgetTitle','Budget')} <span className={`font-bold ${totalBudget>100?'text-red-400':'text-white'}`}>({totalBudget}%/100%)</span></span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">{t('budgetHint','Allocate your resources wisely.')}</p>
+              
+              {modeBudget.map(category=>{
+                const others=Object.entries(budget).filter(([k])=>k!==category.id).reduce((sum,[,v])=>sum+(v||0),0);
+                const maxForThis=Math.min(category.max_value||50,100-others);
+                const name=category.name?.[lang]||category.name?.en||category.id;
+                
+                return<div key={category.id} className="mb-2">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>{category.icon} {name}</span>
+                    <span>{budget[category.id]||0}%</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    min={category.min_value||0} 
+                    max={maxForThis} 
+                    value={Math.min(budget[category.id]||0,maxForThis)} 
+                    onChange={e=>setBudget(prev=>({...prev,[category.id]:parseInt(e.target.value)||0}))} 
+                    className="w-full"
+                  />
                 </div>;
-            }
-            
-            return (
-                <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="max-w-4xl w-full">
-                        <div className="text-center mb-8">
-                            <h1 className="text-3xl font-bold mb-2">
-                                {lang === 'ru' ? 'Выберите вашу партию' : 'Choose Your Party'}
-                            </h1>
-                        </div>
-                        
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                            {modeData.factions.filter(f => f.is_player_option).map(faction => (
-                                <button
-                                    key={faction.id}
-                                    onClick={() => setSelectedFaction(faction.id)}
-                                    className={`rounded-xl p-4 text-left transition-all ${
-                                        selectedFaction === faction.id 
-                                            ? 'ring-2 ring-white bg-gray-700' 
-                                            : 'bg-gray-800 hover:bg-gray-700'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <span className="text-3xl">{faction.icon}</span>
-                                        <div>
-                                            <h3 className="font-bold" style={{ color: faction.color }}>
-                                                {faction.name?.[lang] || faction.name?.en}
-                                            </h3>
-                                            <span className="text-xs text-gray-400">
-                                                {faction.default_seats} {lang === 'ru' ? 'мест' : 'seats'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <p className="text-gray-400 text-sm">
-                                        {faction.description?.[lang] || faction.description?.en}
-                                    </p>
-                                </button>
-                            ))}
-                        </div>
-                        
-                        <div className="flex justify-center">
-                            <button
-                                onClick={() => startGame({ factionId: selectedFaction })}
-                                disabled={!selectedFaction}
-                                className={`px-8 py-3 rounded-lg font-bold transition-colors ${
-                                    selectedFaction 
-                                        ? 'bg-blue-600 hover:bg-blue-700' 
-                                        : 'bg-gray-600 cursor-not-allowed'
-                                }`}
-                            >
-                                {lang === 'ru' ? 'Начать игру' : 'Start Game'}
-                            </button>
-                        </div>
-                    </div>
+              })}
+            </div>
+
+            <button onClick={nextTurn} disabled={totalBudget>100} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+              {totalBudget>100?t('budgetExceeds','Budget exceeds 100%'):t('next','Next')+' →'}
+            </button>
+          </div>
+        </div>;
+      }
+
+      // ========== EVENT ==========
+      if(phase==='event'&&event){
+        return<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
+          <div className="max-w-md w-full relative z-10 animate-slideUp">
+            <div className="bg-slate-800 rounded-2xl border border-blue-500/30 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-900/50 to-slate-800 p-6 text-center">
+                <span className="text-5xl block mb-2">{event.icon}</span>
+                <h2 className="text-xl font-display font-bold text-blue-400">{event.title?.[lang]||event.title?.en}</h2>
+              </div>
+              <div className="p-6">
+                <p className="text-gray-300 text-center mb-6">{event.description?.[lang]||event.description?.en}</p>
+                <div className="space-y-3">
+                  {event.choices?.map((choice,i)=>
+                    <button key={i} onClick={()=>handleChoice(choice)} className="w-full p-4 bg-slate-700/50 hover:bg-slate-600/50 border border-slate-600 hover:border-blue-500/50 rounded-xl text-left transition">
+                      <div className="font-bold text-blue-200">{choice.text?.[lang]||choice.text?.en}</div>
+                      <div className="flex gap-2 mt-2 text-xs flex-wrap">
+                        {Object.entries(choice.effects||{}).map(([k,v])=>{
+                          const stat=modeStats.find(s=>s.id===k);
+                          const icon=stat?.icon||'📊';
+                          return<span key={k} className={v>=0?'text-green-400':'text-red-400'}>{icon}{v>=0?'+':''}{v}</span>;
+                        })}
+                      </div>
+                    </button>
+                  )}
                 </div>
-            );
-        }
+              </div>
+            </div>
+          </div>
+        </div>;
+      }
 
-        // Main Game Screen
-        function GameScreen() {
-            const { state, endTurn, dispatch } = useGame();
-            const { lang } = useLang();
-            
-            return (
-                <div className="min-h-screen p-4">
-                    <div className="max-w-6xl mx-auto">
-                        {/* Header */}
-                        <div className="flex justify-between items-center mb-4">
-                            <h1 className="text-2xl font-bold">🚀 Independence</h1>
-                            <LanguageSwitcher />
-                        </div>
-                        
-                        {/* Turn Header */}
-                        <TurnHeader />
-                        
-                        {/* Main Grid */}
-                        <div className="grid md:grid-cols-3 gap-4 mt-4">
-                            {/* Stats */}
-                            <div className="md:col-span-1">
-                                <StatsPanel />
-                            </div>
-                            
-                            {/* Budget */}
-                            <div className="md:col-span-2">
-                                <BudgetPanel />
-                            </div>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="mt-4 flex justify-center gap-4">
-                            <button
-                                onClick={() => dispatch({ type: 'SET_PHASE', phase: PHASES.BUDGET })}
-                                className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-lg font-bold transition-colors"
-                            >
-                                💰 {lang === 'ru' ? 'Изменить бюджет' : 'Edit Budget'}
-                            </button>
-                            <button
-                                onClick={endTurn}
-                                className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold transition-colors"
-                            >
-                                ⏭️ {lang === 'ru' ? 'Следующий ход' : 'Next Turn'}
-                            </button>
-                        </div>
-                    </div>
-                    
-                    {/* Event Modal */}
-                    {(state.phase === PHASES.EVENT || state.phase === PHASES.CHAIN_REACTION) && (
-                        <EventCard />
-                    )}
-                    
-                    {/* Game Over */}
-                    {state.phase === PHASES.GAME_OVER && <GameOverScreen />}
-                    
-                    {/* Victory */}
-                    {state.phase === PHASES.VICTORY && <VictoryScreen />}
+      // ========== VICTORY / GAMEOVER ==========
+      if(phase==='victory'||phase==='gameover'){
+        const isVictory=phase==='victory';
+        const summary=generateSummary();
+        
+        return<div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center"><StarBackground/>
+          <div className="max-w-md w-full relative z-10 animate-slideUp">
+            <div className={`bg-gradient-to-b ${isVictory?'from-blue-900/50':'from-red-900/50'} to-slate-800 rounded-2xl border ${isVictory?'border-blue-500/50':'border-red-500/50'} p-6`}>
+              <div className="text-center">
+                <span className="text-5xl block mb-2">{isVictory?'🏆':'💀'}</span>
+                <h1 className={`text-2xl font-display font-bold ${isVictory?'gold-gradient':'text-red-400'} mb-2`}>{isVictory?t('victory','Victory!'):t('defeat','Defeat')}</h1>
+                <div className="inline-block bg-slate-800/50 rounded-xl px-6 py-3 mb-4">
+                  <div className="text-3xl font-bold text-blue-400">{finalScore}</div>
+                  <p className="text-gray-400 text-sm">{t('score','Score')}</p>
                 </div>
-            );
-        }
+              </div>
+              
+              {/* Final stats */}
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {modeStats.map(stat=>
+                  <div key={stat.id} className="text-center bg-slate-800/30 rounded-lg p-2">
+                    <span className="text-xl">{stat.icon}</span>
+                    <p className={`font-bold text-sm ${(stats[stat.id]||0)>=(targetStats[stat.id]||50)?'text-green-400':'text-red-400'}`}>
+                      {Math.round(stats[stat.id]||0)}%
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="bg-slate-900/50 rounded-xl p-4 mb-4 max-h-48 overflow-y-auto">
+                <h3 className="text-blue-300 font-bold text-sm mb-2">📜 {t('yourStory','Your Story')}</h3>
+                <p className="text-gray-300 text-sm whitespace-pre-line">{summary}</p>
+              </div>
+              
+              <button onClick={()=>setPhase('lobby')} className={`w-full py-3 bg-gradient-to-r ${isVictory?'from-blue-600 to-blue-500':'from-red-600 to-red-500'} text-white rounded-xl font-bold`}>
+                🔄 {t('playAgain','Play Again')}
+              </button>
+            </div>
+          </div>
+        </div>;
+      }
 
-        // ============================================================================
-        // MAIN APP
-        // ============================================================================
-        function App() {
-            const { state } = useGame();
-            
-            console.log('App render, phase:', state.phase);
-            
-            switch (state.phase) {
-                case PHASES.LOADING:
-                    return (
-                        <div className="min-h-screen flex items-center justify-center">
-                            <div className="text-center">
-                                <div className="text-4xl mb-4 animate-pulse-slow">🚀</div>
-                                <p className="text-gray-400">Loading...</p>
-                            </div>
-                        </div>
-                    );
-                
-                case PHASES.MODE_SELECT:
-                    return <ModeSelectScreen />;
-                
-                case PHASES.SETUP:
-                    return <SetupScreen />;
-                
-                case PHASES.PLAYING:
-                case PHASES.EVENT:
-                case PHASES.CHAIN_REACTION:
-                case PHASES.BUDGET:
-                case PHASES.GAME_OVER:
-                case PHASES.VICTORY:
-                    return <GameScreen />;
-                
-                default:
-                    return <ModeSelectScreen />;
-            }
-        }
+      return null;
+    }
 
-        // ============================================================================
-        // RENDER
-        // ============================================================================
-        function Root() {
-            return (
-                <LangProvider>
-                    <GameProvider>
-                        <AppWithPhaseInit />
-                    </GameProvider>
-                </LangProvider>
-            );
-        }
+    // ============================================================================
+    // APP ROOT
+    // ============================================================================
+    function App(){
+      const{student,loading:studentLoading}=useContext(StudentContext);
+      const{loading:contentLoading}=useContext(ContentContext);
+      
+      if(studentLoading||contentLoading){
+        return<div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/>
+        </div>;
+      }
+      
+      return student?<Game/>:<LoginScreen/>;
+    }
 
-        function AppWithPhaseInit() {
-            const { state, dispatch } = useGame();
-            
-            React.useEffect(() => {
-                // Start at mode selection
-                if (state.phase === PHASES.LOADING) {
-                    dispatch({ type: 'SET_PHASE', phase: PHASES.MODE_SELECT });
-                }
-            }, []);
-            
-            return <App />;
-        }
+    function Root(){
+      return<ContentProvider><LangProvider><StudentProvider><App/></StudentProvider></LangProvider></ContentProvider>;
+    }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<Root />);
-    </script>
+    ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
+  </script>
 </body>
 </html>
