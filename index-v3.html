@@ -18,6 +18,7 @@
     .gold-gradient{background:linear-gradient(180deg,#fbbf24 0%,#d97706 50%,#92400e 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
     input[type="range"]{-webkit-appearance:none;height:8px;border-radius:4px;background:#1e293b}
     input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:linear-gradient(180deg,#fbbf24,#d97706);cursor:pointer}
+    input[type="text"],input[type="email"],input[type="password"]{-webkit-appearance:none;appearance:none}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     @keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -29,6 +30,7 @@
     .star-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
     .star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;opacity:.5}
     .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:200}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem}
   </style>
 </head>
 <body>
@@ -44,7 +46,7 @@
     // ===== DATA LOADER =====
     const loadGameData=async()=>{
       try{
-        const[modes,stats,budget,events,environments,approaches,langs]=await Promise.all([
+        const[modes,stats,budget,events,environments,approaches,langs,texts]=await Promise.all([
           supabase.from('game_modes').select('*').eq('is_active',true).order('sort_order'),
           supabase.from('stats').select('*').order('sort_order'),
           supabase.from('budget_categories_v2').select('*').order('sort_order'),
@@ -52,9 +54,9 @@
           supabase.from('environments').select('*').eq('is_active',true).order('sort_order'),
           supabase.from('approaches').select('*').eq('is_active',true).order('sort_order'),
           supabase.from('languages').select('*').eq('is_active',true).order('sort_order'),
+          supabase.from('ui_texts').select('*'),
         ]);
         
-        // Group by game_mode
         const groupByMode=(arr)=>{
           const result={};
           (arr||[]).forEach(item=>{
@@ -65,7 +67,6 @@
           return result;
         };
         
-        // Events by game_modes array
         const eventsByMode={};
         (events.data||[]).forEach(e=>{
           (e.game_modes||[]).forEach(mode=>{
@@ -74,22 +75,27 @@
           });
         });
         
-        const data={
+        // Parse UI texts
+        const T={ui:{},intro:{},defeat:{},victory:{}};
+        (texts.data||[]).forEach(t=>{
+          const[cat,...rest]=t.key.split('.');
+          const key=rest.join('.');
+          if(T[cat]!==undefined){
+            if(key)T[cat][key]=t.value;
+            else Object.assign(T[cat],t.value);
+          }
+        });
+        
+        return{
           MODES:modes.data||[],
           STATS:groupByMode(stats.data),
           BUDGET:groupByMode(budget.data),
           EVENTS:eventsByMode,
           ENVIRONMENTS:groupByMode(environments.data),
           APPROACHES:groupByMode(approaches.data),
-          LANGUAGES:(langs.data||[]).map(l=>({code:l.code,flag:l.flag,name:l.native_name||l.name}))
+          LANGUAGES:(langs.data||[]).map(l=>({code:l.code,flag:l.flag,name:l.native_name||l.name})),
+          T
         };
-        
-        console.log('✅ Data loaded:',{
-          modes:data.MODES.length,
-          environments:Object.keys(data.ENVIRONMENTS),
-          approaches:Object.keys(data.APPROACHES)
-        });
-        return data;
       }catch(e){
         console.error('❌ Load failed:',e);
         return null;
@@ -106,20 +112,19 @@
         {id:'health',icon:'❤️',name:{en:'Health',ru:'Здоровье'},color:'#EF4444',default_value:50}
       ]},
       BUDGET:{executive:[
-        {id:'welfare',icon:'🤝',name:{en:'Welfare',ru:'Соцзащита'},default_value:15,min_value:0,max_value:50,effects:[{stat:'happiness',multiplier:0.3,baseline:15}]},
-        {id:'economy',icon:'📈',name:{en:'Economy',ru:'Экономика'},default_value:15,min_value:0,max_value:50,effects:[{stat:'wealth',multiplier:0.3,baseline:15}]},
-        {id:'defence',icon:'🛡️',name:{en:'Defence',ru:'Оборона'},default_value:15,min_value:0,max_value:50,effects:[{stat:'security',multiplier:0.3,baseline:15}]},
-        {id:'healthcare',icon:'🏥',name:{en:'Healthcare',ru:'Здравоохранение'},default_value:15,min_value:0,max_value:50,effects:[{stat:'health',multiplier:0.3,baseline:15}]}
+        {id:'welfare',icon:'🤝',name:{en:'Welfare',ru:'Соцзащита'},default_value:15,min_value:0,max_value:50,effects:[{stat:'happiness',multiplier:0.3,baseline:15}]}
       ]},
-      EVENTS:{executive:[{id:'test',icon:'📰',title:{en:'News',ru:'Новости'},description:{en:'Something happened.',ru:'Что-то случилось.'},choices:[{text:{en:'OK',ru:'Ок'},effects:{}}]}]},
+      EVENTS:{executive:[]},
       ENVIRONMENTS:{executive:[{id:'terra_nova',icon:'🌍',name:{en:'Terra Nova',ru:'Терра Нова'},difficulty:2,stats_modifiers:{}}]},
       APPROACHES:{executive:[{id:'presidential',icon:'🦅',name:{en:'Presidential',ru:'Президентская'},traits:{}}]},
-      LANGUAGES:[{code:'en',flag:'🇬🇧',name:'English'},{code:'ru',flag:'🇷🇺',name:'Русский'}]
+      LANGUAGES:[{code:'en',flag:'🇬🇧',name:'English'},{code:'ru',flag:'🇷🇺',name:'Русский'}],
+      T:{ui:{},intro:{},defeat:{},victory:{}}
     };
 
     // ===== CONTEXTS =====
     const DataContext=createContext(FALLBACK);
     const LangContext=createContext({lang:'en',setLang:()=>{},t:(k,o)=>o?.en||k});
+    const AuthContext=createContext(null);
 
     function DataProvider({children}){
       const[data,setData]=useState(FALLBACK);
@@ -136,14 +141,72 @@
     }
 
     function LangProvider({children}){
+      const{T}=useContext(DataContext);
       const[lang,setLang]=useState(()=>localStorage.getItem('lang')||'');
-      const t=useCallback((key,obj)=>obj?.[lang]||obj?.en||obj?.ru||key,[lang]);
+      
+      const t=useCallback((key,obj)=>{
+        if(obj&&typeof obj==='object')return obj[lang]||obj.en||obj.ru||'';
+        const val=T?.ui?.[key];
+        if(val)return val[lang]||val.en||val.ru||key;
+        return key;
+      },[lang,T]);
+      
       const saveLang=l=>{localStorage.setItem('lang',l);setLang(l);};
       return <LangContext.Provider value={{lang,setLang:saveLang,t}}>{children}</LangContext.Provider>;
     }
 
+    function AuthProvider({children}){
+      const[user,setUser]=useState(null);
+      const[profile,setProfile]=useState(null);
+      const[loading,setLoading]=useState(true);
+
+      const loadProfile=useCallback(async(userId)=>{
+        const{data}=await supabase.from('profiles').select('*').eq('id',userId).single();
+        if(data)setProfile(data);
+      },[]);
+
+      useEffect(()=>{
+        supabase.auth.getSession().then(({data:{session}})=>{
+          const u=session?.user||null;
+          setUser(u);
+          if(u)loadProfile(u.id);
+          setLoading(false);
+        });
+        
+        const{data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>{
+          const u=session?.user||null;
+          setUser(u);
+          if(u)loadProfile(u.id);
+          else setProfile(null);
+        });
+        
+        return()=>subscription.unsubscribe();
+      },[loadProfile]);
+
+      const signUp=async(email,password,username)=>{
+        const{data,error}=await supabase.auth.signUp({email,password,options:{data:{username}}});
+        if(error)throw error;
+        return data;
+      };
+
+      const signIn=async(email,password)=>{
+        const{data,error}=await supabase.auth.signInWithPassword({email,password});
+        if(error)throw error;
+        return data;
+      };
+
+      const signOut=async()=>{
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+      };
+
+      return <AuthContext.Provider value={{user,profile,loading,signUp,signIn,signOut,loadProfile}}>{children}</AuthContext.Provider>;
+    }
+
     const useData=()=>useContext(DataContext);
     const useLang=()=>useContext(LangContext);
+    const useAuth=()=>useContext(AuthContext);
 
     // ===== COMPONENTS =====
     const Stars=()=>{
@@ -160,6 +223,142 @@
       useEffect(()=>{const t=setTimeout(onClose,3000);return()=>clearTimeout(t);},[onClose]);
       const colors={success:'bg-green-600',error:'bg-red-600',warning:'bg-amber-600',info:'bg-blue-600'};
       return <div className={`toast ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg animate-slideUp`}>{message}</div>;
+    };
+
+    const Modal=({onClose,title,children})=>(
+      <div className="modal-overlay animate-fadeIn" onClick={onClose}>
+        <div className="bg-slate-800 rounded-xl max-w-md w-full max-h-[90vh] overflow-hidden border border-amber-500/30 mx-4" onClick={e=>e.stopPropagation()}>
+          <div className="flex justify-between items-center p-4 border-b border-slate-700">
+            <h2 className="text-lg font-bold text-amber-400">{title}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">&times;</button>
+          </div>
+          <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">{children}</div>
+        </div>
+      </div>
+    );
+
+    // Auth Modal
+    const AuthModal=({onClose,initialMode='login'})=>{
+      const{signUp,signIn}=useAuth();
+      const{t}=useLang();
+      const[mode,setMode]=useState(initialMode);
+      const[email,setEmail]=useState('');
+      const[password,setPassword]=useState('');
+      const[username,setUsername]=useState('');
+      const[loading,setLoading]=useState(false);
+      const[error,setError]=useState('');
+      const[success,setSuccess]=useState('');
+
+      const handleSubmit=async e=>{
+        e.preventDefault();
+        setLoading(true);setError('');setSuccess('');
+        try{
+          if(mode==='register'){
+            await signUp(email,password,username);
+            setSuccess('Check your email!');
+          }else{
+            await signIn(email,password);
+            onClose();
+          }
+        }catch(err){setError(err.message);}
+        setLoading(false);
+      };
+
+      return(
+        <Modal onClose={onClose} title={mode==='login'?t('login','Login'):t('register','Register')}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode==='register'&&(
+              <input type="text" placeholder={t('username','Username')} value={username} onChange={e=>setUsername(e.target.value)} 
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" required/>
+            )}
+            <input type="email" placeholder={t('email','Email')} value={email} onChange={e=>setEmail(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" required/>
+            <input type="password" placeholder={t('password','Password')} value={password} onChange={e=>setPassword(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-amber-500" required minLength={6}/>
+            {error&&<p className="text-red-400 text-sm">{error}</p>}
+            {success&&<p className="text-green-400 text-sm">{success}</p>}
+            <button type="submit" disabled={loading} className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg font-bold disabled:opacity-50">
+              {loading?'...':mode==='login'?t('login','Login'):t('register','Register')}
+            </button>
+            <p className="text-center text-sm text-gray-400">
+              {mode==='login'?(
+                <span>No account? <button type="button" onClick={()=>setMode('register')} className="text-amber-400">Register</button></span>
+              ):(
+                <span>Have account? <button type="button" onClick={()=>setMode('login')} className="text-amber-400">Login</button></span>
+              )}
+            </p>
+          </form>
+        </Modal>
+      );
+    };
+
+    // Profile Modal
+    const ProfileModal=({onClose})=>{
+      const{profile,signOut}=useAuth();
+      const{t}=useLang();
+      return(
+        <Modal onClose={onClose} title={t('profile','Profile')}>
+          <div className="text-center mb-4">
+            <div className="w-16 h-16 bg-amber-600 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-2">
+              {profile?.display_name?.[0]?.toUpperCase()||'👤'}
+            </div>
+            <h3 className="font-bold text-lg text-amber-300">{profile?.display_name||'Player'}</h3>
+            {profile?.is_premium&&<span className="text-amber-400 text-sm">⭐ Premium</span>}
+          </div>
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex justify-between"><span className="text-gray-400">Games:</span><span className="text-amber-300">{profile?.total_games||0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400">Wins:</span><span className="text-amber-300">{profile?.total_wins||0}</span></div>
+            <div className="flex justify-between"><span className="text-gray-400">Best:</span><span className="text-amber-300">{profile?.highest_score||0}</span></div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">{t('close','Close')}</button>
+            <button onClick={()=>{signOut();onClose();}} className="flex-1 py-2 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded-lg">{t('signOut','Sign Out')}</button>
+          </div>
+        </Modal>
+      );
+    };
+
+    // Premium Modal
+    const PremiumModal=({onClose})=>{
+      const{user}=useAuth();
+      const{t}=useLang();
+      const[loading,setLoading]=useState(false);
+      const[error,setError]=useState('');
+
+      const handlePurchase=async()=>{
+        if(!user){setError('Login first');return;}
+        setLoading(true);
+        try{
+          const res=await fetch('/.netlify/functions/create-checkout',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({userId:user.id,userEmail:user.email})
+          });
+          const data=await res.json();
+          if(data.error)setError(data.error);
+          else if(data.url)window.location.href=data.url;
+        }catch(e){setError('Error');}
+        setLoading(false);
+      };
+
+      return(
+        <Modal onClose={onClose} title="⭐ Premium">
+          <div className="text-center mb-4">
+            <div className="text-4xl font-bold text-amber-400 mb-1">£2.99/mo</div>
+          </div>
+          <div className="bg-slate-700/30 rounded-lg p-4 mb-4 space-y-2">
+            <div className="text-gray-300">🏛️ All political systems</div>
+            <div className="text-gray-300">🌍 All environments</div>
+            <div className="text-gray-300">🏆 All achievements</div>
+            <div className="text-gray-300">📊 Extended stats</div>
+            <div className="text-gray-300">💾 Cloud saves</div>
+          </div>
+          {error&&<p className="text-red-400 text-sm mb-2">{error}</p>}
+          <button onClick={handlePurchase} disabled={loading} className="w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg font-bold disabled:opacity-50">
+            {loading?'...':'Subscribe'}
+          </button>
+        </Modal>
+      );
     };
 
     const StatBar=({stat,value,lang})=>{
@@ -214,6 +413,12 @@
     function Game(){
       const{MODES,STATS,BUDGET,EVENTS,ENVIRONMENTS,APPROACHES,LANGUAGES,loading}=useData();
       const{lang,setLang,t}=useLang();
+      const{user,profile}=useAuth();
+
+      // Modals
+      const[showAuth,setShowAuth]=useState(false);
+      const[showProfile,setShowProfile]=useState(false);
+      const[showPremium,setShowPremium]=useState(false);
 
       // State
       const[phase,setPhase]=useState('lang');
@@ -230,7 +435,9 @@
       const[score,setScore]=useState(0);
       const[toast,setToast]=useState(null);
 
-      // Derived data for current mode
+      const isPremium=profile?.is_premium||false;
+
+      // Derived
       const modeData=MODES.find(m=>m.id===mode)||{};
       const modeStats=STATS[mode]||[];
       const modeBudget=BUDGET[mode]||[];
@@ -240,23 +447,18 @@
       const totalBudget=Object.values(budget).reduce((a,b)=>a+b,0);
       const remaining=hydro-totalBudget;
 
-      // Auto-advance from lang
       useEffect(()=>{if(lang&&phase==='lang')setPhase('mode_select');},[lang,phase]);
 
       const showToast=(msg,type='info')=>setToast({message:msg,type});
 
-      // Initialize game
       const initGame=useCallback(()=>{
         const env=modeEnvs.find(e=>e.id===environment)||modeEnvs[0]||{};
         const app=modeApproaches.find(a=>a.id===approach)||modeApproaches[0]||{};
         
-        // Initialize stats with modifiers
         const initStats={};
         modeStats.forEach(s=>{
           let val=s.default_value||50;
-          // Apply environment modifiers
           if(env.stats_modifiers?.[s.id])val+=env.stats_modifiers[s.id];
-          // Apply approach modifiers
           const bonus=app.traits?.[`${s.id}_bonus`];
           const penalty=app.traits?.[`${s.id}_penalty`];
           if(bonus)val+=bonus;
@@ -265,7 +467,6 @@
         });
         setStats(initStats);
 
-        // Initialize budget
         const initBudget={};
         modeBudget.forEach(b=>{initBudget[b.id]=b.default_value||15;});
         setBudget(initBudget);
@@ -277,7 +478,6 @@
         setPhase('playing');
       },[modeStats,modeBudget,modeEnvs,modeApproaches,environment,approach,modeData]);
 
-      // Apply budget effects
       const applyBudget=useCallback(()=>{
         const newStats={...stats};
         modeBudget.forEach(cat=>{
@@ -292,20 +492,16 @@
         return newStats;
       },[stats,budget,modeBudget]);
 
-      // Get random event
       const getEvent=useCallback(()=>{
         let available=modeEvents.filter(e=>!usedEvents.includes(e.id));
         if(available.length===0){setUsedEvents([]);available=modeEvents;}
         if(available.length===0)return null;
-        // Weight by priority
         const weighted=[];
         available.forEach(e=>{for(let i=0;i<(e.priority||5);i++)weighted.push(e);});
         return weighted[Math.floor(Math.random()*weighted.length)];
       },[modeEvents,usedEvents]);
 
-      // Check game end
       const checkEnd=useCallback((newStats,newTurn)=>{
-        // Defeat
         for(const s of modeStats){
           if(s.on_min_action==='defeat'&&newStats[s.id]<=0){
             setScore(Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length));
@@ -313,7 +509,6 @@
             return true;
           }
         }
-        // Victory
         if(newTurn>maxTurns){
           const avg=Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length);
           const allGood=modeStats.every(s=>newStats[s.id]>=50);
@@ -324,15 +519,11 @@
         return false;
       },[modeStats,maxTurns]);
 
-      // Process turn
       const processTurn=useCallback(()=>{
         if(remaining<0){showToast('❌ Budget exceeded!','error');return;}
-        
         const newStats=applyBudget();
         setStats(newStats);
-        
         if(checkEnd(newStats,turn+1))return;
-        
         const evt=getEvent();
         if(evt){
           setUsedEvents(prev=>[...prev,evt.id]);
@@ -343,16 +534,13 @@
         }
       },[remaining,applyBudget,checkEnd,turn,getEvent]);
 
-      // Handle event choice
       const handleChoice=useCallback(choice=>{
         const newStats={...stats};
         Object.entries(choice.effects||{}).forEach(([k,v])=>{
           if(newStats[k]!==undefined)newStats[k]=Math.max(0,Math.min(100,newStats[k]+v));
         });
         setStats(newStats);
-        
         if(checkEnd(newStats,turn+1)){setEvent(null);return;}
-        
         setEvent(null);
         setTurn(t=>t+1);
         setPhase('playing');
@@ -380,35 +568,59 @@
         );
       }
 
+      // Header component
+      const Header=()=>(
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex gap-2">
+            {!isPremium&&<button onClick={()=>setShowPremium(true)} className="px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-lg text-sm font-bold">⭐ Premium</button>}
+          </div>
+          {user?(
+            <button onClick={()=>setShowProfile(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-full hover:bg-slate-700">
+              <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center text-xs font-bold">{profile?.display_name?.[0]?.toUpperCase()||'👤'}</div>
+              <span className="text-sm text-amber-300">{profile?.display_name||'Profile'}</span>
+              {isPremium&&<span className="text-amber-400">⭐</span>}
+            </button>
+          ):(
+            <button onClick={()=>setShowAuth(true)} className="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-full text-sm font-bold">{t('login','Login')}</button>
+          )}
+        </div>
+      );
+
       // Mode Select
       if(phase==='mode_select'){
         return(
           <div className="min-h-screen bg-slate-950 text-white p-4">
             <Stars/>
-            <div className="max-w-lg mx-auto pt-8 relative z-10">
+            <div className="max-w-lg mx-auto relative z-10">
+              <Header/>
               <h1 className="text-3xl font-display font-bold gold-gradient text-center mb-2">INDEPENDENCE</h1>
-              <p className="text-center text-gray-400 mb-8">{lang==='ru'?'Выберите режим':'Select Game Mode'}</p>
+              <p className="text-center text-gray-400 mb-8">{t('selectMode','Select Game Mode')}</p>
               <div className="space-y-4">
                 {MODES.map(m=>(
                   <button key={m.id} onClick={()=>{setMode(m.id);setEnvironment(null);setApproach(null);setPhase('setup');}} className="w-full p-4 bg-slate-800/70 hover:bg-slate-700/70 border border-amber-500/30 hover:border-amber-500 rounded-xl text-left transition">
                     <div className="flex items-center gap-4">
                       <span className="text-4xl">{m.icon}</span>
                       <div className="flex-1">
-                        <h3 className="text-lg font-bold text-amber-400">{t('name',m.name)}</h3>
-                        <p className="text-sm text-gray-400 mt-1">{t('desc',m.description)}</p>
+                        <h3 className="text-lg font-bold text-amber-400">{m.name?.[lang]||m.name?.en||m.id}</h3>
+                        <p className="text-sm text-gray-400 mt-1">{m.description?.[lang]||m.description?.en||''}</p>
                       </div>
                       <span className="text-2xl text-amber-500">→</span>
                     </div>
                   </button>
                 ))}
               </div>
-              <button onClick={()=>setPhase('lang')} className="w-full mt-6 py-3 text-gray-500 hover:text-gray-400">🌐 {lang==='ru'?'Сменить язык':'Change language'}</button>
+              <button onClick={()=>{localStorage.removeItem('lang');setLang('');setPhase('lang');}} className="w-full mt-6 py-3 text-gray-500 hover:text-gray-400">
+                🌐 {t('changeLanguage','Change language')}
+              </button>
             </div>
+            {showAuth&&<AuthModal onClose={()=>setShowAuth(false)}/>}
+            {showProfile&&<ProfileModal onClose={()=>setShowProfile(false)}/>}
+            {showPremium&&<PremiumModal onClose={()=>setShowPremium(false)}/>}
           </div>
         );
       }
 
-      // Setup: Environment & Approach
+      // Setup
       if(phase==='setup'){
         const envs=modeEnvs;
         const apps=modeApproaches;
@@ -419,69 +631,69 @@
           <div className="min-h-screen bg-slate-950 text-white p-4">
             <Stars/>
             <div className="max-w-md mx-auto pt-4 relative z-10">
-              <button onClick={()=>setPhase('mode_select')} className="text-gray-400 hover:text-white mb-4">← {lang==='ru'?'Назад':'Back'}</button>
+              <button onClick={()=>setPhase('mode_select')} className="text-gray-400 hover:text-white mb-4">← {t('back','Back')}</button>
               
               <div className="flex items-center gap-3 mb-6">
                 <span className="text-3xl">{modeData.icon}</span>
-                <h2 className="text-xl font-bold text-amber-400">{t('name',modeData.name)}</h2>
+                <h2 className="text-xl font-bold text-amber-400">{modeData.name?.[lang]||modeData.name?.en}</h2>
               </div>
 
-              {/* Environment selection */}
               {envs.length>0&&(
                 <div className="mb-6">
                   <label className="text-sm text-gray-400 block mb-2">
-                    {mode==='executive'?'🌍 Planet':mode==='party'?'⚡ Political Climate':'🏘️ District Type'}
+                    {mode==='executive'?'🌍 '+t('planet','Planet'):mode==='party'?'⚡ '+t('climate','Political Climate'):'🏘️ '+t('district','District Type')}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
                     {envs.map(e=>(
                       <button key={e.id} onClick={()=>setEnvironment(e.id)} className={`p-3 rounded-lg border text-left transition ${environment===e.id||(!environment&&e===envs[0])?'border-amber-500 bg-amber-500/20':'border-slate-600 hover:border-slate-500'}`}>
                         <span className="text-2xl">{e.icon}</span>
-                        <p className="text-sm text-amber-200 mt-1">{t('name',e.name)}</p>
+                        <p className="text-sm text-amber-200 mt-1">{e.name?.[lang]||e.name?.en}</p>
                         <p className="text-xs text-gray-500">{'★'.repeat(e.difficulty||2)}</p>
                       </button>
                     ))}
                   </div>
                   {selectedEnv&&(
                     <div className="bg-slate-800/50 rounded-lg p-3 mt-2">
-                      <p className="text-sm text-gray-300">{t('desc',selectedEnv.description)}</p>
+                      <p className="text-sm text-gray-300">{selectedEnv.description?.[lang]||selectedEnv.description?.en}</p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Approach selection */}
               {apps.length>0&&(
                 <div className="mb-6">
                   <label className="text-sm text-gray-400 block mb-2">
-                    {mode==='executive'?'🏛️ Political System':mode==='party'?'🎯 Party Ideology':'📋 Management Style'}
+                    {mode==='executive'?'🏛️ '+t('system','Political System'):mode==='party'?'🎯 '+t('ideology','Party Ideology'):'📋 '+t('style','Management Style')}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    {apps.map(a=>(
-                      <button key={a.id} onClick={()=>setApproach(a.id)} className={`p-3 rounded-lg border text-left transition ${approach===a.id||(!approach&&a===apps[0])?'border-amber-500 bg-amber-500/20':'border-slate-600 hover:border-slate-500'} ${a.is_premium?'opacity-70':''}`}>
-                        <span className="text-2xl">{a.icon}</span>
-                        <p className="text-sm text-amber-200 mt-1">{t('name',a.name)}</p>
-                        {a.is_premium&&<span className="text-xs text-amber-400">⭐ Premium</span>}
-                      </button>
-                    ))}
+                    {apps.map(a=>{
+                      const locked=a.is_premium&&!isPremium;
+                      return(
+                        <button key={a.id} onClick={()=>!locked&&setApproach(a.id)} className={`p-3 rounded-lg border text-left transition ${approach===a.id||(!approach&&a===apps[0])?'border-amber-500 bg-amber-500/20':'border-slate-600 hover:border-slate-500'} ${locked?'opacity-50':''}`}>
+                          <span className="text-2xl">{a.icon}</span>
+                          <p className="text-sm text-amber-200 mt-1">{a.name?.[lang]||a.name?.en}</p>
+                          {locked&&<span className="text-xs text-amber-400">🔒 Premium</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                   {selectedApp&&(
                     <div className="bg-slate-800/50 rounded-lg p-3 mt-2">
-                      <p className="text-sm text-gray-300">{t('desc',selectedApp.description)}</p>
-                      {selectedApp.pros&&<p className="text-xs text-green-400 mt-1">✓ {t('pros',selectedApp.pros)}</p>}
-                      {selectedApp.cons&&<p className="text-xs text-red-400">✗ {t('cons',selectedApp.cons)}</p>}
+                      <p className="text-sm text-gray-300">{selectedApp.description?.[lang]||selectedApp.description?.en}</p>
+                      {selectedApp.pros&&<p className="text-xs text-green-400 mt-1">✓ {selectedApp.pros?.[lang]||selectedApp.pros?.en}</p>}
+                      {selectedApp.cons&&<p className="text-xs text-red-400">✗ {selectedApp.cons?.[lang]||selectedApp.cons?.en}</p>}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Game length */}
               <div className="mb-6">
-                <label className="text-sm text-gray-400 block mb-1">⏱️ {lang==='ru'?'Длина игры':'Game Length'}: {maxTurns} {lang==='ru'?'лет':'years'}</label>
+                <label className="text-sm text-gray-400 block mb-1">⏱️ {t('gameLength','Game Length')}: {maxTurns} {t('years','years')}</label>
                 <input type="range" min="10" max="30" step="5" value={maxTurns} onChange={e=>setMaxTurns(+e.target.value)} className="w-full"/>
               </div>
 
               <button onClick={initGame} className="w-full py-4 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-500 text-slate-900 rounded-xl font-display font-bold text-lg">
-                {lang==='ru'?'Начать игру':'Start Game'}
+                {t('startGame','Start Game')}
               </button>
             </div>
           </div>
@@ -497,15 +709,15 @@
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{modeData.icon}</span>
-                  <span className="text-amber-300 font-bold">{t('name',modeData.name)}</span>
+                  <span className="text-amber-300 font-bold">{modeData.name?.[lang]||mode}</span>
                 </div>
-                <span className="text-amber-400 font-display">{lang==='ru'?'Год':'Year'} {turn}/{maxTurns}</span>
+                <span className="text-amber-400 font-display">{t('year','Year')} {turn}/{maxTurns}</span>
               </div>
 
               <div className="bg-slate-800/50 rounded-xl p-4 border border-amber-500/20 mb-4">
                 {modeStats.map(s=><StatBar key={s.id} stat={s} value={stats[s.id]||0} lang={lang}/>)}
                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-700">
-                  <span className="text-amber-200/80">💎 {lang==='ru'?'Бюджет':'Budget'}</span>
+                  <span className="text-amber-200/80">💎 {t('budget','Budget')}</span>
                   <span className={`font-bold ${remaining<0?'text-red-400':'text-amber-300'}`}>{hydro} ({remaining>=0?'+':''}{remaining})</span>
                 </div>
               </div>
@@ -515,7 +727,7 @@
               </div>
 
               <button onClick={processTurn} disabled={remaining<0} className="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-xl font-bold disabled:opacity-50">
-                {lang==='ru'?'Утвердить бюджет':'Submit Budget'}
+                {t('submit','Submit Budget')}
               </button>
             </div>
             {toast&&<Toast message={toast.message} type={toast.type} onClose={()=>setToast(null)}/>}
@@ -528,9 +740,7 @@
         return(
           <div className="min-h-screen bg-slate-950 text-white p-4 flex items-center justify-center">
             <Stars/>
-            <div className="relative z-10 w-full">
-              <EventCard event={event} onChoice={handleChoice} lang={lang}/>
-            </div>
+            <div className="relative z-10 w-full"><EventCard event={event} onChoice={handleChoice} lang={lang}/></div>
           </div>
         );
       }
@@ -542,11 +752,11 @@
             <Stars/>
             <div className="text-center relative z-10 animate-fadeIn">
               <div className="text-6xl mb-4">🏆</div>
-              <h1 className="text-4xl font-display font-bold gold-gradient mb-4">{lang==='ru'?'ПОБЕДА!':'VICTORY!'}</h1>
-              <p className="text-2xl text-amber-300 mb-2">{lang==='ru'?'Очки':'Score'}: {score}</p>
-              <p className="text-gray-400 mb-8">{turn} {lang==='ru'?'лет':'years'}</p>
+              <h1 className="text-4xl font-display font-bold gold-gradient mb-4">{t('victory','VICTORY!')}</h1>
+              <p className="text-2xl text-amber-300 mb-2">{t('score','Score')}: {score}</p>
+              <p className="text-gray-400 mb-8">{turn} {t('years','years')}</p>
               <button onClick={()=>setPhase('mode_select')} className="px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-xl font-bold">
-                {lang==='ru'?'Играть снова':'Play Again'}
+                {t('playAgain','Play Again')}
               </button>
             </div>
           </div>
@@ -560,11 +770,11 @@
             <Stars/>
             <div className="text-center relative z-10 animate-fadeIn">
               <div className="text-6xl mb-4">💀</div>
-              <h1 className="text-4xl font-display font-bold text-red-500 mb-4">{lang==='ru'?'ПОРАЖЕНИЕ':'DEFEAT'}</h1>
-              <p className="text-2xl text-gray-400 mb-2">{lang==='ru'?'Очки':'Score'}: {score}</p>
-              <p className="text-gray-500 mb-8">{turn} {lang==='ru'?'лет':'years'}</p>
+              <h1 className="text-4xl font-display font-bold text-red-500 mb-4">{t('defeat','DEFEAT')}</h1>
+              <p className="text-2xl text-gray-400 mb-2">{t('score','Score')}: {score}</p>
+              <p className="text-gray-500 mb-8">{turn} {t('years','years')}</p>
               <button onClick={()=>setPhase('mode_select')} className="px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-900 rounded-xl font-bold">
-                {lang==='ru'?'Играть снова':'Play Again'}
+                {t('playAgain','Play Again')}
               </button>
             </div>
           </div>
@@ -578,9 +788,11 @@
     function App(){
       return(
         <DataProvider>
-          <LangProvider>
-            <Game/>
-          </LangProvider>
+          <AuthProvider>
+            <LangProvider>
+              <Game/>
+            </LangProvider>
+          </AuthProvider>
         </DataProvider>
       );
     }
