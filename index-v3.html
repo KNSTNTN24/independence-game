@@ -515,7 +515,8 @@
         setBudget(initBudget);
 
         setTurn(1);
-        setMaxTurns(modeData.default_turns||15);
+        // maxTurns уже установлен пользователем через слайдер, не перезаписываем
+        setPendingChains([]);
         setHydro(100);
         setUsedEvents([]);
         setPhase('playing');
@@ -537,12 +538,17 @@
 
       const getEvent=useCallback((currentTurn)=>{
         // 1. Check for pending chain events
+        console.log('🔍 getEvent turn', currentTurn, 'pendingChains:', pendingChains);
         const pendingNow=pendingChains.find(p=>p.triggerAtTurn<=currentTurn);
         if(pendingNow){
+          console.log('🎯 CHAIN: Found pending event', pendingNow.eventId);
           const chainEvent=modeEvents.find(e=>e.id===pendingNow.eventId);
           if(chainEvent){
+            console.log('✅ CHAIN: Triggering', chainEvent.id);
             setPendingChains(prev=>prev.filter(p=>p.eventId!==pendingNow.eventId));
             return chainEvent;
+          }else{
+            console.log('❌ CHAIN: Event not found in modeEvents!');
           }
         }
         
@@ -622,6 +628,7 @@
         // Queue chain event if choice triggers one
         if(choice.triggers_event){
           const delay=choice.chain_delay||2; // Default 2 turns delay
+          console.log('🔗 CHAIN: Queuing event', choice.triggers_event, 'for turn', turn+delay);
           setPendingChains(prev=>[...prev,{
             eventId:choice.triggers_event,
             triggerAtTurn:turn+delay
