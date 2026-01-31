@@ -474,6 +474,7 @@
       const[hydro,setHydro]=useState(100);
       const[event,setEvent]=useState(null);
       const[usedEvents,setUsedEvents]=useState([]);
+      const[pendingChains,setPendingChains]=useState([]); // [{eventId, triggerAtTurn}]
       const[score,setScore]=useState(0);
       const[toast,setToast]=useState(null);
 
@@ -534,14 +535,32 @@
         return newStats;
       },[stats,budget,modeBudget]);
 
-      const getEvent=useCallback(()=>{
-        let available=modeEvents.filter(e=>!usedEvents.includes(e.id));
-        if(available.length===0){setUsedEvents([]);available=modeEvents;}
+      const getEvent=useCallback((currentTurn)=>{
+        // 1. Check for pending chain events
+        const pendingNow=pendingChains.find(p=>p.triggerAtTurn<=currentTurn);
+        if(pendingNow){
+          const chainEvent=modeEvents.find(e=>e.id===pendingNow.eventId);
+          if(chainEvent){
+            setPendingChains(prev=>prev.filter(p=>p.eventId!==pendingNow.eventId));
+            return chainEvent;
+          }
+        }
+        
+        // 2. Get random event (exclude chain reactions from pool)
+        let available=modeEvents.filter(e=>
+          !usedEvents.includes(e.id) && 
+          !e.is_chain_reaction // Chain reactions only trigger via chains
+        );
+        if(available.length===0){
+          setUsedEvents([]);
+          available=modeEvents.filter(e=>!e.is_chain_reaction);
+        }
         if(available.length===0)return null;
+        
         const weighted=[];
         available.forEach(e=>{for(let i=0;i<(e.priority||5);i++)weighted.push(e);});
         return weighted[Math.floor(Math.random()*weighted.length)];
-      },[modeEvents,usedEvents]);
+      },[modeEvents,usedEvents,pendingChains]);
 
       const checkEnd=useCallback((newStats,newTurn)=>{
         for(const s of modeStats){
@@ -581,14 +600,15 @@
         if(remaining<0){showToast('❌ Budget exceeded!','error');return;}
         const newStats=applyBudget();
         setStats(newStats);
-        if(checkEnd(newStats,turn+1))return;
-        const evt=getEvent();
+        const nextTurn=turn+1;
+        if(checkEnd(newStats,nextTurn))return;
+        const evt=getEvent(nextTurn);
         if(evt){
           setUsedEvents(prev=>[...prev,evt.id]);
           setEvent(evt);
           setPhase('event');
         }else{
-          setTurn(t=>t+1);
+          setTurn(nextTurn);
         }
       },[remaining,applyBudget,checkEnd,turn,getEvent]);
 
@@ -598,6 +618,16 @@
           if(newStats[k]!==undefined)newStats[k]=Math.max(0,Math.min(100,newStats[k]+v));
         });
         setStats(newStats);
+        
+        // Queue chain event if choice triggers one
+        if(choice.triggers_event){
+          const delay=choice.chain_delay||2; // Default 2 turns delay
+          setPendingChains(prev=>[...prev,{
+            eventId:choice.triggers_event,
+            triggerAtTurn:turn+delay
+          }]);
+        }
+        
         if(checkEnd(newStats,turn+1)){setEvent(null);return;}
         setEvent(null);
         setTurn(t=>t+1);
