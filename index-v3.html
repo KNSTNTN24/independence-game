@@ -538,17 +538,12 @@
 
       const getEvent=useCallback((currentTurn)=>{
         // 1. Check for pending chain events
-        console.log('🔍 getEvent turn', currentTurn, 'pendingChains:', pendingChains);
         const pendingNow=pendingChains.find(p=>p.triggerAtTurn<=currentTurn);
         if(pendingNow){
-          console.log('🎯 CHAIN: Found pending event', pendingNow.eventId);
           const chainEvent=modeEvents.find(e=>e.id===pendingNow.eventId);
           if(chainEvent){
-            console.log('✅ CHAIN: Triggering', chainEvent.id);
             setPendingChains(prev=>prev.filter(p=>p.eventId!==pendingNow.eventId));
             return chainEvent;
-          }else{
-            console.log('❌ CHAIN: Event not found in modeEvents!');
           }
         }
         
@@ -625,21 +620,23 @@
         });
         setStats(newStats);
         
-        // Queue chain event if choice triggers one
+        if(checkEnd(newStats,turn+1)){setEvent(null);return;}
+        
+        // If choice triggers chain event - show it immediately
         if(choice.triggers_event){
-          const delay=choice.chain_delay||2; // Default 2 turns delay
-          console.log('🔗 CHAIN: Queuing event', choice.triggers_event, 'for turn', turn+delay);
-          setPendingChains(prev=>[...prev,{
-            eventId:choice.triggers_event,
-            triggerAtTurn:turn+delay
-          }]);
+          const chainEvent=modeEvents.find(e=>e.id===choice.triggers_event);
+          if(chainEvent){
+            setUsedEvents(prev=>[...prev,chainEvent.id]);
+            setEvent(chainEvent);
+            // Stay in 'event' phase, don't increment turn
+            return;
+          }
         }
         
-        if(checkEnd(newStats,turn+1)){setEvent(null);return;}
         setEvent(null);
         setTurn(t=>t+1);
         setPhase('playing');
-      },[stats,checkEnd,turn]);
+      },[stats,checkEnd,turn,modeEvents]);
 
       // ===== RENDER =====
       if(loading)return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Stars/><Spinner/></div>;
