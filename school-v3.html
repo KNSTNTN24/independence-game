@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#2563eb">
-  <title>Independence - School Edition v2</title>
+  <title>Independence - School Edition V3</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -25,6 +25,10 @@
     button{min-height:44px;cursor:pointer;transition:all .15s}button:active{transform:scale(.97)}
     .star-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
     .star{position:absolute;width:2px;height:2px;background:white;border-radius:50%;opacity:.5}
+    .mode-badge{padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;display:inline-block}
+    .mode-executive{background:#7c3aed20;color:#a78bfa;border:1px solid #7c3aed40}
+    .mode-party{background:#2563eb20;color:#60a5fa;border:1px solid #2563eb40}
+    .mode-council{background:#05966920;color:#34d399;border:1px solid #05966940}
   </style>
 </head>
 <body>
@@ -39,7 +43,6 @@
     const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
     const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-    // Default languages
     const DEFAULT_LANGUAGES=[
       {code:'en',name:'English',flag:'🇬🇧'},
       {code:'ru',name:'Русский',flag:'🇷🇺'},
@@ -54,37 +57,25 @@
     const LangContext=createContext({lang:'en',setLang:()=>{},t:()=>''});
 
     // ============================================================================
-    // CONTENT PROVIDER - Loads all game data from Supabase
+    // CONTENT PROVIDER - V3: environments + approaches instead of planets + systems
     // ============================================================================
     function ContentProvider({children}){
       const[content,setContent]=useState({
-        languages:DEFAULT_LANGUAGES,
-        texts:{},
-        systems:{},
-        planets:{},
-        events:[],
-        gameModes:[],
-        stats:{},
-        budgetCategories:{},
-        factions:[]
+        languages:DEFAULT_LANGUAGES,texts:{},
+        environments:[],approaches:[],events:[],
+        gameModes:[],stats:{},budgetCategories:{},factions:[]
       });
       const[loading,setLoading]=useState(true);
 
-      useEffect(()=>{
-        loadAllContent();
-      },[]);
+      useEffect(()=>{loadAll();},[]);
 
-      const loadAllContent=async()=>{
+      const loadAll=async()=>{
         try{
-          // Load all data in parallel
-          const[
-            langsRes,textsRes,systemsRes,planetsRes,eventsRes,
-            modesRes,statsRes,budgetRes,factionsRes
-          ]=await Promise.all([
+          const[langsR,textsR,envsR,appsR,eventsR,modesR,statsR,budgetR,factionsR]=await Promise.all([
             supabase.from('languages').select('*').eq('is_active',true),
             supabase.from('ui_texts').select('*'),
-            supabase.from('political_systems').select('*').eq('is_active',true).order('sort_order'),
-            supabase.from('planets').select('*').eq('is_active',true).order('sort_order'),
+            supabase.from('environments').select('*').eq('is_active',true).order('sort_order'),
+            supabase.from('approaches').select('*').eq('is_active',true).order('sort_order'),
             supabase.from('events').select('*').eq('is_active',true),
             supabase.from('game_modes').select('*').eq('is_active',true).order('sort_order'),
             supabase.from('stats').select('*'),
@@ -92,63 +83,46 @@
             supabase.from('factions').select('*').eq('is_active',true).order('sort_order')
           ]);
 
-          // Transform texts into nested object
           const texts={};
-          textsRes.data?.forEach(t=>{
+          textsR.data?.forEach(t=>{
             const parts=t.key.split('.');
             if(parts.length>=2){
               const[cat,...rest]=parts;
-              const key=rest.join('.');
               if(!texts[cat])texts[cat]={};
-              texts[cat][key]=t.value;
+              texts[cat][rest.join('.')]=t.value;
             }
           });
 
-          // Transform systems into object
-          const systems={};
-          systemsRes.data?.forEach(s=>{systems[s.id]=s;});
-
-          // Transform planets into object
-          const planets={};
-          planetsRes.data?.forEach(p=>{planets[p.id]=p;});
-
           // Group stats by game_mode
           const stats={};
-          statsRes.data?.forEach(s=>{
+          statsR.data?.forEach(s=>{
             if(!stats[s.game_mode])stats[s.game_mode]=[];
             stats[s.game_mode].push(s);
           });
-          // Sort each mode's stats
-          Object.keys(stats).forEach(mode=>{
-            stats[mode].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-          });
+          Object.keys(stats).forEach(m=>{stats[m].sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));});
 
-          // Group budget categories by game_mode
+          // Group budget by game_mode
           const budgetCategories={};
-          budgetRes.data?.forEach(b=>{
+          budgetR.data?.forEach(b=>{
             if(!budgetCategories[b.game_mode])budgetCategories[b.game_mode]=[];
             budgetCategories[b.game_mode].push(b);
           });
 
           setContent({
-            languages:langsRes.data?.length?langsRes.data.map(l=>({code:l.code,name:l.native_name||l.name,flag:l.flag})):DEFAULT_LANGUAGES,
+            languages:langsR.data?.length?langsR.data.map(l=>({code:l.code,name:l.native_name||l.name,flag:l.flag})):DEFAULT_LANGUAGES,
             texts,
-            systems,
-            planets,
-            events:eventsRes.data||[],
-            gameModes:modesRes.data||[],
-            stats,
-            budgetCategories,
-            factions:factionsRes.data||[]
+            environments:envsR.data||[],
+            approaches:appsR.data||[],
+            events:eventsR.data||[],
+            gameModes:modesR.data||[],
+            stats,budgetCategories,
+            factions:factionsR.data||[]
           });
-        }catch(err){
-          console.error('Failed to load content:',err);
-        }finally{
-          setLoading(false);
-        }
+        }catch(err){console.error('Load error:',err);}
+        finally{setLoading(false);}
       };
 
-      return<ContentContext.Provider value={{...content,loading,reload:loadAllContent}}>{children}</ContentContext.Provider>;
+      return<ContentContext.Provider value={{...content,loading,reload:loadAll}}>{children}</ContentContext.Provider>;
     }
 
     // ============================================================================
@@ -159,21 +133,17 @@
       const content=useContext(ContentContext);
       
       const t=useCallback((key,fallback='')=>{
-        // Try school.* texts first
         const val=content?.texts?.school?.[key];
-        if(val&&typeof val==='object'){
-          return val[lang]||val.en||val.ru||fallback||key;
-        }
+        if(val&&typeof val==='object')return val[lang]||val.en||val.ru||fallback||key;
         return fallback||key;
       },[lang,content]);
 
-      const changeLang=(l)=>{setLang(l);localStorage.setItem('school_lang',l);};
-      
+      const changeLang=l=>{setLang(l);localStorage.setItem('school_lang',l);};
       return<LangContext.Provider value={{lang,setLang:changeLang,t}}>{children}</LangContext.Provider>;
     }
 
     // ============================================================================
-    // STUDENT PROVIDER - Handles school authentication
+    // STUDENT PROVIDER - V3: reads game_mode/environment/approach from session
     // ============================================================================
     function StudentProvider({children}){
       const[student,setStudent]=useState(null);
@@ -183,7 +153,7 @@
       const[loading,setLoading]=useState(true);
 
       useEffect(()=>{
-        const saved=localStorage.getItem('school_student');
+        const saved=localStorage.getItem('school_student_v3');
         if(saved){try{const d=JSON.parse(saved);setStudent(d.student);setClassroom(d.classroom);setSession(d.session);setScenario(d.scenario);}catch(e){}}
         setLoading(false);
       },[]);
@@ -191,36 +161,36 @@
       const login=async(joinCode,displayName,pin)=>{
         const{data:classrooms}=await supabase.from('classrooms').select('*').eq('join_code',joinCode.toUpperCase()).eq('is_active',true).limit(1);
         if(!classrooms?.length)throw new Error('Class not found');
-        const classroom=classrooms[0];
+        const cr=classrooms[0];
 
-        let{data:students}=await supabase.from('students').select('*').eq('classroom_id',classroom.id).eq('display_name',displayName).limit(1);
-        let student;
+        let{data:students}=await supabase.from('students').select('*').eq('classroom_id',cr.id).eq('display_name',displayName).limit(1);
+        let st;
         if(students?.length){
-          student=students[0];
-          if(student.pin_code!==pin)throw new Error('Wrong PIN');
+          st=students[0];
+          if(st.pin_code!==pin)throw new Error('Wrong PIN');
         }else{
-          const{data:newStudent,error}=await supabase.from('students').insert({classroom_id:classroom.id,display_name:displayName,pin_code:pin}).select().single();
+          const{data:newSt,error}=await supabase.from('students').insert({classroom_id:cr.id,display_name:displayName,pin_code:pin}).select().single();
           if(error)throw new Error('Could not join');
-          student=newStudent;
+          st=newSt;
         }
 
-        const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroom.id).eq('status','active').order('started_at',{ascending:false}).limit(1);
-        const session=sessions?.[0]||null;
-        const scenario=session?.scenarios||null;
+        const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',cr.id).eq('status','active').order('started_at',{ascending:false}).limit(1);
+        const sess=sessions?.[0]||null;
+        const sc=sess?.scenarios||null;
 
-        setStudent(student);setClassroom(classroom);setSession(session);setScenario(scenario);
-        localStorage.setItem('school_student',JSON.stringify({student,classroom,session,scenario}));
+        setStudent(st);setClassroom(cr);setSession(sess);setScenario(sc);
+        localStorage.setItem('school_student_v3',JSON.stringify({student:st,classroom:cr,session:sess,scenario:sc}));
       };
 
-      const logout=()=>{setStudent(null);setClassroom(null);setSession(null);setScenario(null);localStorage.removeItem('school_student');};
+      const logout=()=>{setStudent(null);setClassroom(null);setSession(null);setScenario(null);localStorage.removeItem('school_student_v3');};
       
       const refreshSession=async()=>{
         if(!classroom)return;
         const{data:sessions}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroom.id).eq('status','active').limit(1);
-        const newSession=sessions?.[0]||null;
-        const newScenario=newSession?.scenarios||null;
-        setSession(newSession);setScenario(newScenario);
-        localStorage.setItem('school_student',JSON.stringify({student,classroom,session:newSession,scenario:newScenario}));
+        const sess=sessions?.[0]||null;
+        const sc=sess?.scenarios||null;
+        setSession(sess);setScenario(sc);
+        localStorage.setItem('school_student_v3',JSON.stringify({student,classroom,session:sess,scenario:sc}));
       };
 
       return<StudentContext.Provider value={{student,classroom,session,scenario,loading,login,logout,refreshSession}}>{children}</StudentContext.Provider>;
@@ -246,14 +216,12 @@
       </div>;
     }
 
-    // Stat bar component - works with any stat from DB
     function StatBar({stat,value,target,lang}){
       const name=stat.name?.[lang]||stat.name?.en||stat.id;
       const icon=stat.icon||'📊';
       const color=stat.color||'#3B82F6';
       const pct=Math.max(0,Math.min(100,value));
       const meetsTarget=target?pct>=target:true;
-      
       return<div className="mb-2">
         <div className="flex justify-between text-xs mb-1">
           <span>{icon} {name}</span>
@@ -278,7 +246,7 @@
       const[error,setError]=useState('');
       const[loading,setLoading]=useState(false);
 
-      const handleSubmit=async(e)=>{
+      const handleSubmit=async e=>{
         e.preventDefault();
         if(!joinCode||!displayName||!pin){setError(t('fillAllFields','Please fill all fields'));return;}
         if(pin.length!==4||!/^\d+$/.test(pin)){setError(t('pinMustBe4','PIN must be 4 digits'));return;}
@@ -294,7 +262,7 @@
           <div className="flex justify-end mb-2"><LangSelector/></div>
           <div className="text-center mb-8">
             <h1 className="text-4xl font-display font-bold gold-gradient mb-2">INDEPENDENCE</h1>
-            <p className="text-blue-300/80 text-sm tracking-widest">SCHOOL EDITION</p>
+            <p className="text-blue-300/80 text-sm tracking-widest">SCHOOL EDITION V3</p>
           </div>
           <form onSubmit={handleSubmit} className="bg-slate-800/50 border border-blue-500/30 rounded-2xl p-6 space-y-4">
             <div>
@@ -320,67 +288,74 @@
     }
 
     // ============================================================================
-    // MAIN GAME
+    // MAIN GAME - V3: environments, approaches, event chains, game mode from session
     // ============================================================================
     function Game(){
       const{student,classroom,session,scenario,logout,refreshSession}=useContext(StudentContext);
-      const{systems,planets,events,stats:allStats,budgetCategories:allBudget,texts}=useContext(ContentContext);
+      const{environments:allEnvs,approaches:allApps,events:allEvents,stats:allStats,budgetCategories:allBudget,gameModes:allModes,texts}=useContext(ContentContext);
       const{lang,t}=useContext(LangContext);
 
-      // Game mode - default to 'executive'
-      const gameMode='executive';
+      // V3: Game mode from session (teacher sets it)
+      const gameMode=session?.game_mode||scenario?.game_mode||'executive';
+      const gmData=allModes.find(m=>m.id===gameMode);
       
-      // Get stats and budget for this game mode
+      // V3: Filter environments & approaches for this game mode
+      const modeEnvs=useMemo(()=>allEnvs.filter(e=>e.game_mode===gameMode),[allEnvs,gameMode]);
+      const modeApps=useMemo(()=>allApps.filter(a=>a.game_mode===gameMode),[allApps,gameMode]);
+      
+      // Stats and budget for mode
       const modeStats=allStats[gameMode]||[];
       const modeBudget=allBudget[gameMode]||[];
 
-      // Scenario settings
-      const maxTurns=scenario?.max_turns||12;
-      const targetStats=scenario?.target_stats||{happiness:60,wealth:60,stability:60,health:60};
+      // V3: Events filtered for game mode, with chain support
+      const modeEvents=useMemo(()=>
+        allEvents.filter(e=>!e.game_modes||e.game_modes.length===0||e.game_modes.includes(gameMode)),
+        [allEvents,gameMode]
+      );
 
-      // Filter available systems based on scenario
-      const availableSystems=useMemo(()=>{
-        if(!scenario||!scenario.allowed_systems||!scenario.allowed_systems.length)return systems;
-        const filtered={};
-        scenario.allowed_systems.forEach(id=>{if(systems[id])filtered[id]=systems[id];});
-        return Object.keys(filtered).length>0?filtered:systems;
-      },[scenario,systems]);
+      // Session constraints (teacher may lock environment/approach)
+      const sessionEnvId=session?.environment_id||null;
+      const sessionAppId=session?.approach_id||null;
+      const maxTurns=session?.max_turns||scenario?.max_turns||12;
+      const targetStats=scenario?.target_stats||Object.fromEntries(modeStats.map(s=>[s.id,50]));
 
       // Game state
       const[phase,setPhase]=useState('lobby');
       const[turn,setTurn]=useState(1);
       const[stats,setStats]=useState({});
       const[budget,setBudget]=useState({});
-      const[system,setSystem]=useState('parliamentary');
-      const[planetId,setPlanetId]=useState('terranova');
+      const[approachId,setApproachId]=useState(sessionAppId||modeApps[0]?.id||'');
+      const[envId,setEnvId]=useState(sessionEnvId||modeEnvs[0]?.id||'');
       const[event,setEvent]=useState(null);
       const[usedEvents,setUsedEvents]=useState([]);
+      const[pendingChains,setPendingChains]=useState([]);
       const[finalScore,setFinalScore]=useState(0);
       const[decisionsLog,setDecisionsLog]=useState([]);
       const[classLeaderboard,setClassLeaderboard]=useState([]);
 
-      // Initialize stats and budget from DB data
+      // Current selections
+      const currentEnv=modeEnvs.find(e=>e.id===envId)||modeEnvs[0];
+      const currentApp=modeApps.find(a=>a.id===approachId)||modeApps[0];
+
+      // Init stats & budget from DB
       useEffect(()=>{
         if(modeStats.length>0){
-          const initialStats={};
-          modeStats.forEach(s=>{initialStats[s.id]=s.default_value||50;});
-          setStats(initialStats);
+          const init={};
+          modeStats.forEach(s=>{init[s.id]=s.default_value||50;});
+          setStats(init);
         }
         if(modeBudget.length>0){
-          const initialBudget={};
-          modeBudget.forEach(b=>{initialBudget[b.id]=b.default_value||15;});
-          setBudget(initialBudget);
+          const init={};
+          modeBudget.forEach(b=>{init[b.id]=b.default_value||15;});
+          setBudget(init);
         }
-      },[modeStats,modeBudget]);
+      },[modeStats.length,modeBudget.length]);
 
-      // Set default system if current not available
+      // Set defaults when mode data loads
       useEffect(()=>{
-        const available=Object.keys(availableSystems);
-        if(available.length>0&&!availableSystems[system])setSystem(available[0]);
-      },[availableSystems]);
-
-      const sys=systems[system]||Object.values(systems)[0]||{icon:'🏛️',name:{en:'Democracy'}};
-      const planet=planets[planetId]||Object.values(planets)[0]||{icon:'🌍',name:{en:'Terra Nova'},stats:{happiness:60,wealth:50,stability:70}};
+        if(modeEnvs.length>0&&!modeEnvs.find(e=>e.id===envId))setEnvId(sessionEnvId||modeEnvs[0].id);
+        if(modeApps.length>0&&!modeApps.find(a=>a.id===approachId))setApproachId(sessionAppId||modeApps[0].id);
+      },[modeEnvs,modeApps]);
 
       // Load leaderboard
       useEffect(()=>{
@@ -392,112 +367,128 @@
 
       useEffect(()=>{if(phase==='lobby')refreshSession();},[phase]);
 
+      // ===== GAME LOGIC =====
       const startGame=()=>{
-        // Initialize stats from planet
-        const p=planets[planetId];
         const initialStats={};
         modeStats.forEach(s=>{
-          // Use planet stats if available, otherwise default
-          initialStats[s.id]=p?.stats?.[s.id]||s.default_value||50;
+          let val=s.default_value||50;
+          // V3: Apply environment stats_modifiers
+          if(currentEnv?.stats_modifiers){
+            const mod=currentEnv.stats_modifiers[s.id];
+            if(mod!==undefined)val=mod;
+          }
+          initialStats[s.id]=val;
         });
         setStats(initialStats);
         setTurn(1);
         setUsedEvents([]);
+        setPendingChains([]);
         setDecisionsLog([]);
         setPhase('playing');
       };
 
-      const calculateScore=(s,t)=>{
-        const statSum=Object.values(s).reduce((a,b)=>a+b,0);
-        return Math.round(statSum*10/Object.keys(s).length+t*50);
-      };
-
-      const endGame=async(isVictory,vType,finalStats)=>{
-        const score=calculateScore(finalStats,turn);
-        setFinalScore(score);
-        setPhase(isVictory?'victory':'gameover');
-        if(student&&session){
-          await supabase.from('student_results').insert({
-            student_id:student.id,session_id:session.id,political_system:system,planet_id:planetId,
-            final_turn:turn,final_score:score,is_victory:isVictory,victory_type:vType,
-            final_happiness:Math.round(finalStats.happiness||0),
-            final_wealth:Math.round(finalStats.wealth||0),
-            final_stability:Math.round(finalStats.stability||0),
-            decisions_log:decisionsLog,completed_at:new Date().toISOString()
+      const applyBudgetEffects=useCallback(()=>{
+        const newStats={...stats};
+        modeBudget.forEach(cat=>{
+          const val=budget[cat.id]||0;
+          (cat.effects||[]).forEach(eff=>{
+            const change=(val-(eff.baseline||15))*(eff.multiplier||0);
+            if(newStats[eff.stat]!==undefined){
+              newStats[eff.stat]=Math.max(0,Math.min(100,newStats[eff.stat]+change));
+            }
           });
-        }
-      };
+        });
+        return newStats;
+      },[stats,budget,modeBudget]);
 
-      const checkGameEnd=(newStats,currentTurn)=>{
-        // Check for defeat (any stat at 0)
-        for(const stat of modeStats){
-          if(stat.on_min_action==='defeat'&&newStats[stat.id]<=0){
-            endGame(false,stat.id,newStats);
+      // V3: Event selection with chains and priority weighting
+      const getEvent=useCallback((currentTurn)=>{
+        // 1. Check pending chain events
+        const pendingNow=pendingChains.find(p=>p.triggerAtTurn<=currentTurn);
+        if(pendingNow){
+          const chainEvt=modeEvents.find(e=>e.id===pendingNow.eventId);
+          if(chainEvt){
+            setPendingChains(prev=>prev.filter(p=>p.eventId!==pendingNow.eventId));
+            return chainEvt;
+          }
+        }
+        // 2. Random event (exclude chain reactions)
+        let available=modeEvents.filter(e=>
+          !usedEvents.includes(e.id)&&
+          !e.is_chain_reaction&&
+          (e.system==='general'||e.system===approachId||!e.system)
+        );
+        if(!available.length){
+          setUsedEvents([]);
+          available=modeEvents.filter(e=>!e.is_chain_reaction);
+        }
+        if(!available.length)return null;
+        // Priority weighting
+        const weighted=[];
+        available.forEach(e=>{for(let i=0;i<(e.priority||5);i++)weighted.push(e);});
+        return weighted[Math.floor(Math.random()*weighted.length)];
+      },[modeEvents,usedEvents,pendingChains,approachId]);
+
+      const checkGameEnd=(newStats,newTurn)=>{
+        // Defeat: any stat at 0
+        for(const s of modeStats){
+          if(s.on_min_action==='defeat'&&newStats[s.id]<=0){
+            const score=Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length);
+            endGame(false,'collapse',newStats,score,newTurn);
             return true;
           }
         }
-        // Check for end of turns
-        if(currentTurn>maxTurns){
-          // Check if all targets met
-          let allMet=true;
-          for(const[statId,target]of Object.entries(targetStats)){
-            if(newStats[statId]<target)allMet=false;
-          }
-          if(allMet)endGame(true,'utopia',newStats);
-          else if(Object.values(newStats).every(v=>v>=50))endGame(true,'survival',newStats);
-          else endGame(true,'struggle',newStats);
+        // End of turns
+        if(newTurn>maxTurns){
+          const avg=Math.floor(Object.values(newStats).reduce((a,b)=>a+b,0)/modeStats.length);
+          const allGood=modeStats.every(s=>newStats[s.id]>=50);
+          const score=avg+newTurn*2+(allGood?20:0);
+          endGame(allGood||Object.values(newStats).every(v=>v>=30), allGood?'utopia':'struggle', newStats, score, newTurn);
           return true;
         }
         return false;
       };
 
-      const triggerEvent=()=>{
-        // Filter events for this game mode
-        const modeEvents=events.filter(e=>
-          (!e.game_modes||e.game_modes.includes(gameMode))&&
-          (e.system==='general'||e.system===system)&&
-          !usedEvents.includes(e.id)
-        );
-        if(!modeEvents.length)return false;
-        const ev=modeEvents[Math.floor(Math.random()*modeEvents.length)];
-        setEvent(ev);
-        setUsedEvents(prev=>[...prev,ev.id]);
-        setPhase('event');
-        return true;
-      };
-
-      const applyBudgetEffects=()=>{
-        const newStats={...stats};
-        
-        // Apply effects from each budget category
-        modeBudget.forEach(category=>{
-          const value=budget[category.id]||0;
-          const effects=category.effects||[];
-          
-          effects.forEach(effect=>{
-            const baseline=effect.baseline||15;
-            const multiplier=effect.multiplier||0;
-            const change=(value-baseline)*multiplier;
-            
-            if(newStats[effect.stat]!==undefined){
-              newStats[effect.stat]=Math.min(100,Math.max(0,newStats[effect.stat]+change));
-            }
-          });
-        });
-        
-        setStats(newStats);
-        return newStats;
+      const endGame=async(isVictory,vType,finalStats,score,finalTurn)=>{
+        setFinalScore(score);
+        setPhase(isVictory?'victory':'gameover');
+        if(!student||!session)return;
+        // V3: Save final_stats as JSON object
+        const resultData={
+          student_id:student.id,
+          session_id:session.id,
+          political_system:approachId,
+          environment_id:envId,
+          approach_id:approachId,
+          final_turn:finalTurn||turn,
+          final_score:score,
+          is_victory:isVictory,
+          victory_type:vType,
+          final_stats:Object.fromEntries(Object.entries(finalStats).map(([k,v])=>[k,Math.round(v)])),
+          decisions_log:decisionsLog,
+          completed_at:new Date().toISOString()
+        };
+        try{await supabase.from('student_results').insert(resultData);}
+        catch(e){console.error('Save error:',e);}
       };
 
       const nextTurn=()=>{
         const newStats=applyBudgetEffects();
-        if(!triggerEvent()){
-          const newTurn=turn+1;
-          if(!checkGameEnd(newStats,newTurn))setTurn(newTurn);
+        setStats(newStats);
+        const nextT=turn+1;
+        if(checkGameEnd(newStats,nextT))return;
+        const evt=getEvent(nextT);
+        if(evt){
+          setUsedEvents(prev=>[...prev,evt.id]);
+          setEvent(evt);
+          setPhase('event');
+        }else{
+          setTurn(nextT);
         }
       };
 
-      const handleChoice=(choice)=>{
+      // V3: Handle choice with event chains
+      const handleChoice=choice=>{
         setDecisionsLog(prev=>[...prev,{
           turn,eventId:event?.id,
           eventTitle:event?.title?.[lang]||event?.title?.en||'Event',
@@ -506,58 +497,60 @@
           effects:choice.effects||{}
         }]);
         
-        const effects=choice.effects||{};
         const newStats={...stats};
-        Object.entries(effects).forEach(([k,v])=>{
-          if(newStats[k]!==undefined){
-            newStats[k]=Math.min(100,Math.max(0,newStats[k]+v));
-          }
+        Object.entries(choice.effects||{}).forEach(([k,v])=>{
+          if(newStats[k]!==undefined)newStats[k]=Math.max(0,Math.min(100,newStats[k]+v));
         });
         setStats(newStats);
         
-        const newTurn=turn+1;
-        if(!checkGameEnd(newStats,newTurn)){
-          setTurn(newTurn);
-          setEvent(null);
-          setPhase('playing');
+        if(checkGameEnd(newStats,turn+1)){setEvent(null);return;}
+        
+        // V3: Event chains - immediate trigger
+        if(choice.triggers_event){
+          const chainEvt=modeEvents.find(e=>e.id===choice.triggers_event);
+          if(chainEvt){
+            setUsedEvents(prev=>[...prev,chainEvt.id]);
+            setEvent(chainEvt);
+            return; // Stay in event phase
+          }
         }
+        
+        setEvent(null);
+        setTurn(t=>t+1);
+        setPhase('playing');
       };
 
-      // Generate story summary
+      // Story summary
       const generateSummary=useCallback(()=>{
-        const sysName=systems[system]?.name?.[lang]||systems[system]?.name?.en||system;
-        const planetName=planets[planetId]?.name?.[lang]||planets[planetId]?.name?.en||planetId;
+        const appName=currentApp?.name?.[lang]||currentApp?.name?.en||approachId;
+        const envName=currentEnv?.name?.[lang]||currentEnv?.name?.en||envId;
         const isVictory=phase==='victory';
         
-        let summary=`${sysName} (${planetName}) `;
-        
+        let s=`${appName} (${envName}): `;
         if(isVictory){
-          summary+=`${t('summaryGovSuccess','successfully governed for')} ${turn} ${t('summaryYears','years')}. `;
+          s+=`${t('summaryGovSuccess','Successfully governed for')} ${turn} ${t('summaryYears','years')}. `;
         }else{
-          // Find which stat failed
           let failReason='collapse';
           for(const stat of modeStats){
-            if(stats[stat.id]<=0){
-              failReason=stat.name?.[lang]||stat.name?.en||stat.id;
-              break;
-            }
+            if(stats[stat.id]<=0){failReason=stat.name?.[lang]||stat.name?.en||stat.id;break;}
           }
-          summary+=`${t('summaryGovCollapse','collapsed after')} ${turn} ${t('summaryYears','years')} ${t('summaryDueTo','due to')} ${failReason}. `;
+          s+=`${t('summaryGovCollapse','Collapsed after')} ${turn} ${t('summaryYears','years')} — ${failReason}. `;
         }
-        
         if(decisionsLog.length>0){
-          summary+=`\n\n${t('summaryKeyMoments','Key moments')}:\n`;
+          s+=`\n\n${t('summaryKeyMoments','Key moments')}:\n`;
           decisionsLog.slice(0,5).forEach(d=>{
-            const effectText=Object.entries(d.effects||{}).map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(', ');
-            summary+=`• ${t('year','Year')} ${d.turn}: ${d.eventIcon} ${d.eventTitle} — "${d.choice}"${effectText?' ('+effectText+')':''}\n`;
+            const fx=Object.entries(d.effects||{}).map(([k,v])=>`${k} ${v>=0?'+':''}${v}`).join(', ');
+            s+=`• ${t('year','Year')} ${d.turn}: ${d.eventIcon} ${d.eventTitle} — "${d.choice}"${fx?' ('+fx+')':''}\n`;
           });
         }
-        
-        return summary;
-      },[system,planetId,turn,stats,decisionsLog,phase,systems,planets,modeStats,lang,t]);
+        return s;
+      },[approachId,envId,turn,stats,decisionsLog,phase,currentApp,currentEnv,modeStats,lang,t]);
 
       // ========== LOBBY ==========
       if(phase==='lobby'){
+        const envLocked=!!sessionEnvId;
+        const appLocked=!!sessionAppId;
+        
         return<div className="min-h-screen bg-slate-950 text-white p-4"><StarBackground/>
           <div className="max-w-md mx-auto pt-4 relative z-10">
             <div className="flex justify-between items-center mb-4">
@@ -571,9 +564,14 @@
               </div>
             </div>
 
+            {/* Game mode badge */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className={`mode-badge mode-${gameMode}`}>{gmData?.icon||'🎮'} {gmData?.name?.en||gameMode}</span>
+              {scenario&&<span className="text-sm text-gray-400">{scenario.title?.[lang]||scenario.title?.en}</span>}
+            </div>
+
             {scenario&&<div className="bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-4">
-              <h3 className="font-bold text-blue-300">{scenario.title?.[lang]||scenario.title?.en||'Scenario'}</h3>
-              <p className="text-sm text-gray-400 mt-1">{scenario.description?.[lang]||scenario.description?.en}</p>
+              <p className="text-sm text-gray-400">{scenario.description?.[lang]||scenario.description?.en}</p>
               <div className="flex gap-4 mt-2 text-xs text-gray-500">
                 <span>⏱️ {scenario.duration_minutes||30} min</span>
                 <span>🔄 {maxTurns} turns</span>
@@ -595,44 +593,67 @@
               <summary className="text-blue-300 font-bold cursor-pointer">{t('howToPlayTitle','📖 How to Play')}</summary>
               <div className="mt-3 text-sm text-gray-400 space-y-2">
                 <p><strong className="text-white">🎯</strong> {t('howToPlayGoal','Keep your colony stable while maintaining all stats above target levels.')}</p>
-                <p><strong className="text-white">🏛️</strong> {t('howToPlaySystem','Each political system has unique traits.')}</p>
+                <p><strong className="text-white">🏛️</strong> {t('howToPlaySystem','Each approach has unique traits and challenges.')}</p>
                 <p><strong className="text-white">💰</strong> {t('howToPlayBudget','Allocate your budget wisely. Each category affects different stats.')}</p>
                 <p><strong className="text-white">⚡</strong> {t('howToPlayEvents','Random events will test your leadership. Your choices have consequences!')}</p>
                 <p><strong className="text-white">💀</strong> {t('howToPlayDefeat','If any stat drops to 0%, your government collapses.')}</p>
               </div>
             </details>
 
-            {/* System Selection */}
-            <div className="mb-4">
-              <label className="text-sm text-gray-400 block mb-2">🏛️ {t('politicalSystem','Political System')}</label>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(availableSystems).map(([id,s])=>
-                  <button key={id} onClick={()=>setSystem(id)} className={`p-3 rounded-lg border text-left transition ${system===id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
-                    <span className="text-2xl">{s.icon}</span>
-                    <p className="text-sm text-white mt-1">{s.name?.[lang]||s.name?.en||id}</p>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Planet Selection */}
-            <div className="mb-4">
-              <label className="text-sm text-gray-400 block mb-2">🌍 {t('planet','Planet')}</label>
-              <div className="grid grid-cols-5 gap-2">
-                {Object.entries(planets).map(([id,p])=>
-                  <button key={id} onClick={()=>setPlanetId(id)} className={`p-2 rounded-lg border text-center ${planetId===id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={p.name?.[lang]||p.name?.en||id}>
-                    <span className="text-2xl">{p.icon}</span>
-                  </button>
-                )}
-              </div>
-              {planets[planetId]&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-white font-bold">{planets[planetId]?.name?.[lang]||planets[planetId]?.name?.en||planetId}</span>
-                  <span className="text-xs text-gray-500">{'⭐'.repeat(planets[planetId]?.difficulty||1)}</span>
+            {/* V3: Approach Selection (was Political System) */}
+            {modeApps.length>0&&<div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🏛️ {t('approach','Approach')}</label>
+              {appLocked?
+                <div className="p-3 bg-slate-800/50 border border-blue-500/30 rounded-lg flex items-center gap-2">
+                  <span className="text-2xl">{currentApp?.icon||'🏛️'}</span>
+                  <div>
+                    <p className="text-white font-bold">{currentApp?.name?.[lang]||currentApp?.name?.en||approachId}</p>
+                    <p className="text-xs text-gray-500">🔒 {t('setByTeacher','Set by teacher')}</p>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-400">{planets[planetId]?.description?.[lang]||planets[planetId]?.description?.en}</p>
+              :
+                <div className="grid grid-cols-2 gap-2">
+                  {modeApps.map(a=>
+                    <button key={a.id} onClick={()=>setApproachId(a.id)} className={`p-3 rounded-lg border text-left transition ${approachId===a.id?'border-blue-500 bg-blue-500/20':'border-slate-600 hover:border-slate-500'}`}>
+                      <span className="text-2xl">{a.icon||'🏛️'}</span>
+                      <p className="text-sm text-white mt-1">{a.name?.[lang]||a.name?.en||a.id}</p>
+                      {a.is_premium&&<span className="text-yellow-400 text-xs">⭐</span>}
+                    </button>
+                  )}
+                </div>
+              }
+            </div>}
+
+            {/* V3: Environment Selection (was Planet) */}
+            {modeEnvs.length>0&&<div className="mb-4">
+              <label className="text-sm text-gray-400 block mb-2">🌍 {t('environment','Environment')}</label>
+              {envLocked?
+                <div className="p-3 bg-slate-800/50 border border-blue-500/30 rounded-lg flex items-center gap-2">
+                  <span className="text-2xl">{currentEnv?.icon||'🌍'}</span>
+                  <div>
+                    <p className="text-white font-bold">{currentEnv?.name?.[lang]||currentEnv?.name?.en||envId}</p>
+                    <p className="text-xs text-gray-500">🔒 {t('setByTeacher','Set by teacher')}</p>
+                  </div>
+                </div>
+              :
+                <div className="grid grid-cols-3 gap-2">
+                  {modeEnvs.map(e=>
+                    <button key={e.id} onClick={()=>setEnvId(e.id)} className={`p-2 rounded-lg border text-center ${envId===e.id?'border-blue-500 bg-blue-500/20':'border-slate-600'}`} title={e.name?.[lang]||e.name?.en||e.id}>
+                      <span className="text-2xl">{e.icon||'🌍'}</span>
+                      <p className="text-xs text-white mt-1">{e.name?.[lang]||e.name?.en||e.id}</p>
+                      <span className="text-xs text-gray-500">{'⭐'.repeat(e.difficulty||1)}</span>
+                    </button>
+                  )}
+                </div>
+              }
+              {currentEnv&&!envLocked&&<div className="mt-2 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-white font-bold">{currentEnv.icon} {currentEnv.name?.[lang]||currentEnv.name?.en}</span>
+                  <span className="text-xs text-gray-500">{'⭐'.repeat(currentEnv.difficulty||1)}</span>
+                </div>
+                <p className="text-xs text-gray-400">{currentEnv.description?.[lang]||currentEnv.description?.en}</p>
               </div>}
-            </div>
+            </div>}
 
             <button onClick={startGame} disabled={!session} className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
               🚀 {t('play','Play')}
@@ -661,53 +682,38 @@
           <div className="max-w-md mx-auto relative z-10">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{sys?.icon||'🏛️'}</span>
-                <span className="text-blue-300 font-bold">{sys?.name?.[lang]||sys?.name?.en||system}</span>
+                <span className="text-2xl">{currentApp?.icon||'🏛️'}</span>
+                <span className="text-blue-300 font-bold">{currentApp?.name?.[lang]||currentApp?.name?.en||approachId}</span>
               </div>
               <div className="text-right">
                 <span className="text-blue-400 font-display">{t('year','Year')} {turn}/{maxTurns}</span>
-                <p className="text-xs text-gray-500">{planets[planetId]?.name?.[lang]||planetId}</p>
+                <p className="text-xs text-gray-500">{currentEnv?.icon} {currentEnv?.name?.[lang]||currentEnv?.name?.en||envId}</p>
               </div>
             </div>
 
-            {/* Stats - Dynamic from DB */}
+            {/* Stats */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
               {modeStats.map(stat=>
-                <StatBar 
-                  key={stat.id} 
-                  stat={stat} 
-                  value={stats[stat.id]||0} 
-                  target={targetStats[stat.id]} 
-                  lang={lang}
-                />
+                <StatBar key={stat.id} stat={stat} value={stats[stat.id]||0} target={targetStats[stat.id]} lang={lang}/>
               )}
             </div>
 
-            {/* Budget - Dynamic from DB */}
+            {/* Budget */}
             <div className="bg-slate-800/50 rounded-xl p-4 border border-blue-500/20 mb-4">
               <div className="flex justify-between mb-2">
                 <span className="text-gray-400">{t('budgetTitle','Budget')} <span className={`font-bold ${totalBudget>100?'text-red-400':'text-white'}`}>({totalBudget}%/100%)</span></span>
               </div>
               <p className="text-xs text-gray-500 mb-3">{t('budgetHint','Allocate your resources wisely.')}</p>
-              
               {modeBudget.map(category=>{
                 const others=Object.entries(budget).filter(([k])=>k!==category.id).reduce((sum,[,v])=>sum+(v||0),0);
                 const maxForThis=Math.min(category.max_value||50,100-others);
                 const name=category.name?.[lang]||category.name?.en||category.id;
-                
                 return<div key={category.id} className="mb-2">
                   <div className="flex justify-between text-xs mb-1">
                     <span>{category.icon} {name}</span>
                     <span>{budget[category.id]||0}%</span>
                   </div>
-                  <input 
-                    type="range" 
-                    min={category.min_value||0} 
-                    max={maxForThis} 
-                    value={Math.min(budget[category.id]||0,maxForThis)} 
-                    onChange={e=>setBudget(prev=>({...prev,[category.id]:parseInt(e.target.value)||0}))} 
-                    className="w-full"
-                  />
+                  <input type="range" min={category.min_value||0} max={maxForThis} value={Math.min(budget[category.id]||0,maxForThis)} onChange={e=>setBudget(prev=>({...prev,[category.id]:parseInt(e.target.value)||0}))} className="w-full"/>
                 </div>;
               })}
             </div>
@@ -737,8 +743,7 @@
                       <div className="flex gap-2 mt-2 text-xs flex-wrap">
                         {Object.entries(choice.effects||{}).map(([k,v])=>{
                           const stat=modeStats.find(s=>s.id===k);
-                          const icon=stat?.icon||'📊';
-                          return<span key={k} className={v>=0?'text-green-400':'text-red-400'}>{icon}{v>=0?'+':''}{v}</span>;
+                          return<span key={k} className={v>=0?'text-green-400':'text-red-400'}>{stat?.icon||'📊'}{v>=0?'+':''}{v}</span>;
                         })}
                       </div>
                     </button>
@@ -768,7 +773,7 @@
               </div>
               
               {/* Final stats */}
-              <div className="grid grid-cols-4 gap-2 mb-4">
+              <div className={`grid grid-cols-${Math.min(modeStats.length,4)} gap-2 mb-4`}>
                 {modeStats.map(stat=>
                   <div key={stat.id} className="text-center bg-slate-800/30 rounded-lg p-2">
                     <span className="text-xl">{stat.icon}</span>
@@ -801,13 +806,11 @@
     function App(){
       const{student,loading:studentLoading}=useContext(StudentContext);
       const{loading:contentLoading}=useContext(ContentContext);
-      
       if(studentLoading||contentLoading){
         return<div className="min-h-screen bg-slate-950 flex items-center justify-center">
           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"/>
         </div>;
       }
-      
       return student?<Game/>:<LoginScreen/>;
     }
 
