@@ -3,848 +3,737 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Independence Admin</title>
+  <title>Independence Admin V3</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    .json-editor { font-family: monospace; font-size: 12px; }
-    .tab-active { border-bottom: 2px solid #f59e0b; color: #f59e0b; }
-    .lang-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; }
-    .lang-ru { background: #3b82f6; color: white; }
-    .lang-en { background: #ef4444; color: white; }
-    .lang-de { background: #fbbf24; color: black; }
+    .lang-badge{padding:2px 6px;border-radius:4px;font-size:11px;font-weight:bold}
+    .lang-ru{background:#3b82f6;color:white}
+    .lang-en{background:#ef4444;color:white}
+    .lang-de{background:#fbbf24;color:black}
+    .tab-active{background:rgba(245,158,11,0.15);color:#f59e0b;border-color:rgba(245,158,11,0.5)}
+    .mode-badge{padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
+    .mode-executive{background:#7c3aed20;color:#a78bfa;border:1px solid #7c3aed40}
+    .mode-party{background:#2563eb20;color:#60a5fa;border:1px solid #2563eb40}
+    .mode-council{background:#05966920;color:#34d399;border:1px solid #05966940}
   </style>
 </head>
 <body class="bg-slate-900 text-white min-h-screen">
-  <div id="app"></div>
+<div id="app"></div>
+<script type="module">
+// ===== CONFIG =====
+const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const LANGS=['en','ru'];
+const GAME_MODES=['executive','party','council'];
 
-  <script type="module">
-    // ===== CONFIG =====
-    const SUPABASE_URL = 'https://dnkeinsedcrlhwbiycfo.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ===== STATE =====
+let S={
+  user:null,profile:null,loading:true,error:null,
+  tab:'events',data:{},editing:null,
+  modeFilter:'all', // filter for mode-specific tables
+  toast:null
+};
 
-    // ===== STATE =====
-    let state = {
-      user: null,
-      profile: null,
-      loading: true,
-      activeTab: 'events',
-      data: {},
-      editing: null,
-      languages: ['ru', 'en', 'de']
-    };
+// ===== TABLE CONFIGS =====
+const TABS={
+  events:{
+    name:'Events',icon:'⚡',table:'events',
+    pkFields:['id'],
+    hasGameModes:true, // uses game_modes[] array
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID'},
+      {key:'icon',type:'text',label:'Icon (emoji)'},
+      {key:'game_modes',type:'game_modes_array',label:'Game Modes'},
+      {key:'title',type:'jsonb',label:'Title'},
+      {key:'description',type:'jsonb',label:'Description'},
+      {key:'choices',type:'choices',label:'Choices'},
+      {key:'is_chain_trigger',type:'boolean',label:'Chain Trigger'},
+      {key:'is_chain_reaction',type:'boolean',label:'Chain Reaction'},
+      {key:'priority',type:'number',label:'Priority (1-10)'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  environments:{
+    name:'Environments',icon:'🌍',table:'environments',
+    pkFields:['id','game_mode'],
+    modeField:'game_mode',
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID'},
+      {key:'game_mode',type:'game_mode_select',pk:true,label:'Game Mode'},
+      {key:'icon',type:'text',label:'Icon (emoji)'},
+      {key:'name',type:'jsonb',label:'Name'},
+      {key:'description',type:'jsonb',label:'Description'},
+      {key:'difficulty',type:'number',label:'Difficulty (1-5)'},
+      {key:'stats_modifiers',type:'json',label:'Stats Modifiers {stat: ±value}'},
+      {key:'traits',type:'json',label:'Traits (JSON)'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  approaches:{
+    name:'Approaches',icon:'🏛️',table:'approaches',
+    pkFields:['id','game_mode'],
+    modeField:'game_mode',
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID'},
+      {key:'game_mode',type:'game_mode_select',pk:true,label:'Game Mode'},
+      {key:'icon',type:'text',label:'Icon (emoji)'},
+      {key:'name',type:'jsonb',label:'Name'},
+      {key:'description',type:'jsonb',label:'Description'},
+      {key:'leader_title',type:'jsonb',label:'Leader Title'},
+      {key:'pros',type:'jsonb',label:'Pros'},
+      {key:'cons',type:'jsonb',label:'Cons'},
+      {key:'traits',type:'json',label:'Traits {stat_bonus, stat_penalty}'},
+      {key:'is_premium',type:'boolean',label:'Premium'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  stats:{
+    name:'Stats',icon:'📊',table:'stats',
+    pkFields:['id','game_mode'],
+    modeField:'game_mode',
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID (happiness, wealth)'},
+      {key:'game_mode',type:'game_mode_select',pk:true,label:'Game Mode'},
+      {key:'icon',type:'text',label:'Icon'},
+      {key:'name',type:'jsonb',label:'Name'},
+      {key:'color',type:'text',label:'Color (#hex)'},
+      {key:'default_value',type:'number',label:'Default Value'},
+      {key:'on_min_action',type:'select',label:'On Min',options:['defeat','warning','none']},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  budget_categories_v2:{
+    name:'Budget',icon:'💰',table:'budget_categories_v2',
+    pkFields:['id','game_mode'],
+    modeField:'game_mode',
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID'},
+      {key:'game_mode',type:'game_mode_select',pk:true,label:'Game Mode'},
+      {key:'icon',type:'text',label:'Icon'},
+      {key:'name',type:'jsonb',label:'Name'},
+      {key:'default_value',type:'number',label:'Default (15)'},
+      {key:'min_value',type:'number',label:'Min (0)'},
+      {key:'max_value',type:'number',label:'Max (50)'},
+      {key:'effects',type:'effects',label:'Effects'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  game_modes:{
+    name:'Game Modes',icon:'🎮',table:'game_modes',
+    pkFields:['id'],
+    fields:[
+      {key:'id',type:'text',pk:true,label:'ID'},
+      {key:'icon',type:'text',label:'Icon'},
+      {key:'name',type:'jsonb',label:'Name'},
+      {key:'description',type:'jsonb',label:'Description'},
+      {key:'default_turns',type:'number',label:'Default Turns'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  },
+  ui_texts:{
+    name:'UI Texts',icon:'📝',table:'ui_texts',
+    pkFields:['key'],
+    fields:[
+      {key:'key',type:'text',pk:true,label:'Key (ui.title)'},
+      {key:'value',type:'jsonb',label:'Value'}
+    ]
+  },
+  languages:{
+    name:'Languages',icon:'🌐',table:'languages',
+    pkFields:['code'],
+    fields:[
+      {key:'code',type:'text',pk:true,label:'Code (en, ru)'},
+      {key:'name',type:'text',label:'Name'},
+      {key:'native_name',type:'text',label:'Native Name'},
+      {key:'flag',type:'text',label:'Flag (emoji)'},
+      {key:'is_active',type:'boolean',label:'Active'},
+      {key:'sort_order',type:'number',label:'Sort Order'}
+    ]
+  }
+};
 
-    const TABLES = {
-      events: { 
-        name: 'События', 
-        icon: '⚡', 
-        table: 'events',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID (уникальный)' },
-          { key: 'icon', type: 'text', label: 'Иконка (emoji)' },
-          { key: 'system', type: 'select', label: 'Система', options: ['general', 'parliamentary', 'presidential', 'monarchy', 'dictatorship', 'technocracy', 'direct'] },
-          { key: 'title', type: 'jsonb', label: 'Заголовок' },
-          { key: 'description', type: 'jsonb', label: 'Описание' },
-          { key: 'choices', type: 'choices', label: 'Варианты ответов' },
-          { key: 'is_active', type: 'boolean', label: 'Активно' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      ui_texts: { 
-        name: 'UI Тексты', 
-        icon: '📝', 
-        table: 'ui_texts',
-        fields: [
-          { key: 'key', type: 'text', required: true, label: 'Ключ (ui.title, intro.p1)' },
-          { key: 'category', type: 'text', label: 'Категория' },
-          { key: 'value', type: 'jsonb', label: 'Значение' }
-        ]
-      },
-      political_systems: { 
-        name: 'Полит. системы', 
-        icon: '🏛️', 
-        table: 'political_systems',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID' },
-          { key: 'icon', type: 'text', label: 'Иконка' },
-          { key: 'name', type: 'jsonb', label: 'Название' },
-          { key: 'leader', type: 'jsonb', label: 'Лидер' },
-          { key: 'description', type: 'jsonb', label: 'Описание' },
-          { key: 'pros', type: 'jsonb', label: 'Плюсы' },
-          { key: 'cons', type: 'jsonb', label: 'Минусы' },
-          { key: 'traits', type: 'json', label: 'Traits (JSON)' },
-          { key: 'is_premium', type: 'boolean', label: 'Premium' },
-          { key: 'is_active', type: 'boolean', label: 'Активно' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      planets: { 
-        name: 'Планеты', 
-        icon: '🌍', 
-        table: 'planets',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID' },
-          { key: 'icon', type: 'text', label: 'Иконка' },
-          { key: 'name', type: 'jsonb', label: 'Название' },
-          { key: 'description', type: 'jsonb', label: 'Описание' },
-          { key: 'traits', type: 'jsonb', label: 'Черты' },
-          { key: 'quote', type: 'jsonb', label: 'Цитата' },
-          { key: 'difficulty', type: 'number', label: 'Сложность (1-5)' },
-          { key: 'stats', type: 'json', label: 'Stats (JSON)' },
-          { key: 'mods', type: 'json', label: 'Mods (JSON)' },
-          { key: 'is_active', type: 'boolean', label: 'Активно' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      languages: { 
-        name: 'Языки', 
-        icon: '🌐', 
-        table: 'languages',
-        fields: [
-          { key: 'code', type: 'text', required: true, label: 'Код (ru, en, de)' },
-          { key: 'name', type: 'text', label: 'Название (English)' },
-          { key: 'native_name', type: 'text', label: 'На родном (Русский)' },
-          { key: 'flag', type: 'text', label: 'Флаг (emoji)' },
-          { key: 'is_active', type: 'boolean', label: 'Активно' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      // ===== V2 TABLES =====
-      game_modes: {
-        name: '🎮 Game Modes',
-        icon: '🎮',
-        table: 'game_modes',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID (executive, school)' },
-          { key: 'icon', type: 'text', label: 'Иконка' },
-          { key: 'name', type: 'jsonb', label: 'Название' },
-          { key: 'description', type: 'jsonb', label: 'Описание' },
-          { key: 'config', type: 'json', label: 'Config (JSON)' },
-          { key: 'is_active', type: 'boolean', label: 'Активно' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      stats: {
-        name: '📊 Stats V2',
-        icon: '📊',
-        table: 'stats',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID (happiness, wealth)' },
-          { key: 'game_mode', type: 'text', label: 'Game Mode (executive)' },
-          { key: 'icon', type: 'text', label: 'Иконка' },
-          { key: 'name', type: 'jsonb', label: 'Название' },
-          { key: 'color', type: 'text', label: 'Цвет (#22C55E)' },
-          { key: 'default_value', type: 'number', label: 'Default (50)' },
-          { key: 'min_value', type: 'number', label: 'Min (0)' },
-          { key: 'max_value', type: 'number', label: 'Max (100)' },
-          { key: 'on_min_action', type: 'select', label: 'При min', options: ['defeat', 'warning', 'none'] },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      },
-      budget_categories_v2: {
-        name: '💰 Budget V2',
-        icon: '💰',
-        table: 'budget_categories_v2',
-        fields: [
-          { key: 'id', type: 'text', required: true, label: 'ID (welfare, defence)' },
-          { key: 'game_mode', type: 'text', label: 'Game Mode (executive)' },
-          { key: 'icon', type: 'text', label: 'Иконка' },
-          { key: 'name', type: 'jsonb', label: 'Название' },
-          { key: 'default_value', type: 'number', label: 'Default (15)' },
-          { key: 'min_value', type: 'number', label: 'Min (0)' },
-          { key: 'max_value', type: 'number', label: 'Max (50)' },
-          { key: 'effects', type: 'effects', label: 'Effects' },
-          { key: 'sort_order', type: 'number', label: 'Порядок' }
-        ]
-      }
-    };
+// ===== AUTH =====
+async function checkAuth(){
+  const{data:{session}}=await supabase.auth.getSession();
+  if(!session){S.loading=false;render();return;}
+  S.user=session.user;
+  const{data:profile}=await supabase.from('profiles').select('*').eq('id',session.user.id).single();
+  if(!profile?.is_admin){S.loading=false;S.error='Access denied. Admin rights required.';render();return;}
+  S.profile=profile;S.loading=false;
+  await loadData(S.tab);
+  render();
+}
 
-    // ===== AUTH =====
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        state.loading = false;
-        render();
-        return;
-      }
-      
-      state.user = session.user;
-      const { data: profile } = await supabase.from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (!profile?.is_admin) {
-        state.loading = false;
-        state.error = 'Доступ запрещён. Нужны права администратора.';
-        render();
-        return;
-      }
-      
-      state.profile = profile;
-      state.loading = false;
-      await loadData(state.activeTab);
-      render();
-    }
+async function signIn(email,password){
+  const{error}=await supabase.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  await checkAuth();
+}
 
-    async function signIn(email, password) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      await checkAuth();
-    }
+// ===== DATA =====
+async function loadData(tab){
+  const cfg=TABS[tab];if(!cfg)return;
+  const{data,error}=await supabase.from(cfg.table).select('*').order('sort_order',{ascending:true,nullsFirst:false});
+  if(error){console.error('Load error:',error);return;}
+  S.data[tab]=data||[];
+  render();
+}
 
-    async function signOut() {
-      await supabase.auth.signOut();
-      state.user = null;
-      state.profile = null;
-      render();
-    }
+function getFilteredItems(tab){
+  const items=S.data[tab]||[];
+  const cfg=TABS[tab];
+  if(S.modeFilter==='all')return items;
+  if(cfg.modeField)return items.filter(i=>i[cfg.modeField]===S.modeFilter);
+  if(cfg.hasGameModes)return items.filter(i=>(i.game_modes||[]).includes(S.modeFilter));
+  return items;
+}
 
-    // ===== DATA =====
-    async function loadData(tab) {
-      const config = TABLES[tab];
-      if (!config) return;
-      
-      const { data, error } = await supabase
-        .from(config.table)
-        .select('*')
-        .order('sort_order', { ascending: true, nullsFirst: false });
-      
-      if (error) {
-        console.error('Load error:', error);
-        return;
-      }
-      
-      state.data[tab] = data || [];
-      render();
-    }
+async function saveItem(tab,item){
+  const cfg=TABS[tab];
+  const isNew=!item._original;
+  const toSave={...item};
+  delete toSave._original;
+  
+  let result;
+  if(isNew){
+    result=await supabase.from(cfg.table).insert(toSave);
+  }else{
+    let query=supabase.from(cfg.table).update(toSave);
+    cfg.pkFields.forEach(pk=>{query=query.eq(pk,item._original[pk]);});
+    result=await query;
+  }
+  if(result.error){toast('Error: '+result.error.message,'error');return false;}
+  toast('Saved!','success');
+  await loadData(tab);
+  S.editing=null;
+  render();
+  return true;
+}
 
-    async function saveItem(tab, item) {
-      const config = TABLES[tab];
-      const isNew = !item._original;
-      
-      // Remove internal fields
-      const toSave = { ...item };
-      delete toSave._original;
-      delete toSave._expanded;
-      
-      let result;
-      if (isNew) {
-        result = await supabase.from(config.table).insert(toSave);
-      } else {
-        const primaryKey = config.fields.find(f => f.required)?.key || 'id';
-        result = await supabase.from(config.table)
-          .update(toSave)
-          .eq(primaryKey, item._original[primaryKey]);
-      }
-      
-      if (result.error) {
-        alert('Ошибка сохранения: ' + result.error.message);
-        return false;
-      }
-      
-      await loadData(tab);
-      state.editing = null;
-      render();
-      return true;
-    }
+async function deleteItem(tab,item){
+  if(!confirm('Delete this record?'))return;
+  const cfg=TABS[tab];
+  let query=supabase.from(cfg.table).delete();
+  cfg.pkFields.forEach(pk=>{query=query.eq(pk,item[pk]);});
+  const{error}=await query;
+  if(error){toast('Error: '+error.message,'error');return;}
+  toast('Deleted','success');
+  await loadData(tab);
+  render();
+}
 
-    async function deleteItem(tab, item) {
-      if (!confirm('Удалить эту запись?')) return;
-      
-      const config = TABLES[tab];
-      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
-      
-      const { error } = await supabase
-        .from(config.table)
-        .delete()
-        .eq(primaryKey, item[primaryKey]);
-      
-      if (error) {
-        alert('Ошибка удаления: ' + error.message);
-        return;
-      }
-      
-      await loadData(tab);
-      render();
-    }
+function toast(msg,type='info'){
+  S.toast={msg,type};render();
+  setTimeout(()=>{S.toast=null;render();},3000);
+}
 
-    // ===== RENDER =====
-    function render() {
-      const app = document.getElementById('app');
-      
-      if (state.loading) {
-        app.innerHTML = `
-          <div class="flex items-center justify-center min-h-screen">
-            <div class="text-center">
-              <div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p class="text-amber-300">Загрузка...</p>
-            </div>
-          </div>
-        `;
-        return;
-      }
+// ===== RENDER =====
+function render(){
+  const app=document.getElementById('app');
+  if(S.loading){app.innerHTML=`<div class="flex items-center justify-center min-h-screen"><div class="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div></div>`;return;}
+  if(S.error){app.innerHTML=`<div class="flex items-center justify-center min-h-screen"><div class="text-center"><p class="text-red-400 text-xl mb-4">⛔ ${S.error}</p><button onclick="location.reload()" class="px-4 py-2 bg-slate-700 rounded hover:bg-slate-600">Reload</button></div></div>`;return;}
+  if(!S.user){app.innerHTML=renderLogin();attachLoginListener();return;}
+  
+  app.innerHTML=`
+    <div class="flex h-screen">
+      ${renderSidebar()}
+      <div class="flex-1 overflow-auto">
+        ${renderHeader()}
+        ${renderContent()}
+      </div>
+    </div>
+    ${S.editing?renderEditModal():''}
+    ${S.toast?`<div class="fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg ${S.toast.type==='error'?'bg-red-600':'bg-green-600'} shadow-lg">${esc(S.toast.msg)}</div>`:''}
+  `;
+  attachLoginListener();
+}
 
-      if (state.error) {
-        app.innerHTML = `
-          <div class="flex items-center justify-center min-h-screen">
-            <div class="text-center">
-              <p class="text-red-400 text-xl mb-4">⛔ ${state.error}</p>
-              <button onclick="location.reload()" class="px-4 py-2 bg-slate-700 rounded hover:bg-slate-600">Обновить</button>
-            </div>
-          </div>
-        `;
-        return;
-      }
+function renderLogin(){
+  return`<div class="flex items-center justify-center min-h-screen">
+    <div class="bg-slate-800 p-8 rounded-xl max-w-md w-full mx-4">
+      <h1 class="text-2xl font-bold text-amber-400 mb-6 text-center">🔐 Independence Admin V3</h1>
+      <form id="loginForm" class="space-y-4">
+        <div><label class="block text-sm text-gray-400 mb-1">Email</label>
+          <input type="email" id="email" required class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none"></div>
+        <div><label class="block text-sm text-gray-400 mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none"></div>
+        <button type="submit" class="w-full py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">Sign In</button>
+      </form>
+      <p class="text-center text-gray-500 text-sm mt-4">Admin access only</p>
+    </div>
+  </div>`;
+}
 
-      if (!state.user) {
-        app.innerHTML = renderLogin();
-        return;
-      }
+function renderSidebar(){
+  const sections=[
+    {title:'Content',tabs:['events','environments','approaches']},
+    {title:'Game Config',tabs:['stats','budget_categories_v2','game_modes']},
+    {title:'System',tabs:['ui_texts','languages']}
+  ];
+  return`<div class="w-56 bg-slate-800 border-r border-slate-700 flex flex-col">
+    <div class="p-4 border-b border-slate-700">
+      <h1 class="text-lg font-bold text-amber-400">⚙️ Admin V3</h1>
+    </div>
+    <nav class="flex-1 p-2 overflow-y-auto">
+      ${sections.map(sec=>`
+        <p class="text-xs text-gray-500 uppercase px-3 pt-3 pb-1">${sec.title}</p>
+        ${sec.tabs.map(key=>{
+          const t=TABS[key];
+          return`<button onclick="switchTab('${key}')" class="w-full text-left px-3 py-2 rounded-lg mb-0.5 flex items-center gap-2 text-sm ${S.tab===key?'tab-active':'hover:bg-slate-700 text-gray-300'}">
+            <span>${t.icon}</span><span>${t.name}</span>
+            <span class="ml-auto text-xs opacity-50">${(S.data[key]||[]).length}</span>
+          </button>`;
+        }).join('')}
+      `).join('')}
+    </nav>
+    <div class="p-3 border-t border-slate-700">
+      <p class="text-xs text-gray-400 mb-2">👤 ${esc(S.profile?.display_name||S.user?.email)}</p>
+      <button onclick="handleSignOut()" class="text-xs text-red-400 hover:text-red-300">Sign Out</button>
+    </div>
+  </div>`;
+}
 
-      app.innerHTML = `
-        <div class="flex h-screen">
-          ${renderSidebar()}
-          <div class="flex-1 overflow-auto">
-            ${renderHeader()}
-            ${renderContent()}
-          </div>
-        </div>
-        ${state.editing ? renderEditModal() : ''}
-      `;
-      
-      attachEventListeners();
-    }
+function renderHeader(){
+  const cfg=TABS[S.tab];
+  const showModeFilter=cfg.modeField||cfg.hasGameModes;
+  return`<div class="p-4 border-b border-slate-700 flex flex-wrap justify-between items-center gap-3">
+    <div>
+      <h2 class="text-xl font-bold">${cfg.icon} ${cfg.name}</h2>
+      <p class="text-gray-500 text-xs">${cfg.table}</p>
+    </div>
+    <div class="flex items-center gap-2">
+      ${showModeFilter?`
+        <select onchange="setModeFilter(this.value)" class="px-3 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:outline-none">
+          <option value="all" ${S.modeFilter==='all'?'selected':''}>All modes</option>
+          ${GAME_MODES.map(m=>`<option value="${m}" ${S.modeFilter===m?'selected':''}>${m}</option>`).join('')}
+        </select>
+      `:''}
+      <button onclick="handleRefresh()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">🔄</button>
+      <button onclick="handleAdd()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 rounded-lg text-sm font-bold">➕ Add</button>
+    </div>
+  </div>`;
+}
 
-    function renderLogin() {
-      return `
-        <div class="flex items-center justify-center min-h-screen">
-          <div class="bg-slate-800 p-8 rounded-xl max-w-md w-full mx-4">
-            <h1 class="text-2xl font-bold text-amber-400 mb-6 text-center">🔐 Independence Admin</h1>
-            <form id="loginForm" class="space-y-4">
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Email</label>
-                <input type="email" id="email" required 
-                  class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="block text-sm text-gray-400 mb-1">Пароль</label>
-                <input type="password" id="password" required 
-                  class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:border-amber-500 focus:outline-none">
-              </div>
-              <button type="submit" 
-                class="w-full py-3 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
-                Войти
-              </button>
-            </form>
-            <p class="text-center text-gray-500 text-sm mt-4">Только для администраторов</p>
-          </div>
-        </div>
-      `;
-    }
+function renderContent(){
+  const cfg=TABS[S.tab];
+  const items=getFilteredItems(S.tab);
+  if(!items.length)return`<div class="p-8 text-center text-gray-400"><p class="text-4xl mb-2">📭</p><p>No records</p></div>`;
+  
+  return`<div class="p-4 space-y-1.5">
+    ${items.map(item=>renderItem(cfg,item)).join('')}
+  </div>`;
+}
 
-    function renderSidebar() {
-      return `
-        <div class="w-64 bg-slate-800 border-r border-slate-700 flex flex-col">
-          <div class="p-4 border-b border-slate-700">
-            <h1 class="text-xl font-bold text-amber-400">⚙️ Admin Panel</h1>
-            <p class="text-sm text-gray-400">Independence Game</p>
-          </div>
-          <nav class="flex-1 p-2">
-            ${Object.entries(TABLES).map(([key, config]) => `
-              <button onclick="switchTab('${key}')" 
-                class="w-full text-left px-4 py-3 rounded-lg mb-1 flex items-center gap-3 ${state.activeTab === key ? 'bg-amber-600/20 text-amber-400' : 'hover:bg-slate-700 text-gray-300'}">
-                <span class="text-xl">${config.icon}</span>
-                <span>${config.name}</span>
-                <span class="ml-auto text-xs bg-slate-600 px-2 py-0.5 rounded">${state.data[key]?.length || 0}</span>
-              </button>
-            `).join('')}
-          </nav>
-          <div class="p-4 border-t border-slate-700">
-            <p class="text-sm text-gray-400 mb-2">👤 ${state.profile?.display_name || state.user?.email}</p>
-            <button onclick="handleSignOut()" class="text-sm text-red-400 hover:text-red-300">Выйти</button>
+function renderItem(cfg,item){
+  const pk=item[cfg.pkFields[0]];
+  const titleField=cfg.fields.find(f=>f.type==='jsonb')?.key;
+  const title=titleField&&item[titleField]?(item[titleField].en||item[titleField].ru||pk):pk;
+  const mode=item.game_mode;
+  const modes=item.game_modes;
+  const pkId=cfg.pkFields.map(k=>item[k]).join('|||');
+  
+  return`<div class="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-slate-500 transition">
+    <div class="flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        ${item.icon?`<span class="text-xl shrink-0">${item.icon}</span>`:''}
+        <div class="min-w-0">
+          <p class="font-semibold text-amber-200 truncate">${esc(String(title).substring(0,60))}</p>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="text-xs text-gray-500">${pk}</span>
+            ${mode?`<span class="mode-badge mode-${mode}">${mode}</span>`:''}
+            ${modes?modes.map(m=>`<span class="mode-badge mode-${m}">${m}</span>`).join(''):''}
+            ${item.is_chain_trigger?'<span class="text-xs bg-purple-900/50 text-purple-300 px-1.5 rounded">⛓️ trigger</span>':''}
+            ${item.is_chain_reaction?'<span class="text-xs bg-blue-900/50 text-blue-300 px-1.5 rounded">⛓️ reaction</span>':''}
+            ${item.is_premium?'<span class="text-xs bg-yellow-900/50 text-yellow-300 px-1.5 rounded">⭐</span>':''}
+            ${item.is_active===false?'<span class="text-xs text-red-400">⊘</span>':''}
           </div>
         </div>
-      `;
-    }
+      </div>
+      <div class="flex gap-1.5 shrink-0">
+        <button onclick="handleEdit('${esc(pkId)}')" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">✏️</button>
+        <button onclick="handleDelete('${esc(pkId)}')" class="px-2.5 py-1 bg-red-900/40 hover:bg-red-800/40 text-red-300 rounded text-sm">🗑️</button>
+      </div>
+    </div>
+  </div>`;
+}
 
-    function renderHeader() {
-      const config = TABLES[state.activeTab];
-      return `
-        <div class="p-6 border-b border-slate-700 flex justify-between items-center">
-          <div>
-            <h2 class="text-2xl font-bold">${config.icon} ${config.name}</h2>
-            <p class="text-gray-400 text-sm">Таблица: ${config.table}</p>
-          </div>
-          <div class="flex gap-2">
-            <button onclick="handleRefresh()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
-              🔄 Обновить
-            </button>
-            <button onclick="handleAdd()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
-              ➕ Добавить
-            </button>
-          </div>
+// ===== EDIT MODAL =====
+function renderEditModal(){
+  const cfg=TABS[S.tab];
+  const item=S.editing;
+  const isNew=!item._original;
+  return`<div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onclick="handleCloseModal(event)">
+    <div class="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
+      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+        <h3 class="text-lg font-bold text-amber-400">${isNew?'➕ New':'✏️ Edit'} ${cfg.name}</h3>
+        <button onclick="handleCloseModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <form id="editForm" class="space-y-4">
+          ${cfg.fields.map(f=>renderField(f,item)).join('')}
+        </form>
+      </div>
+      <div class="p-4 border-t border-slate-700 flex justify-end gap-2">
+        <button onclick="handleCloseModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">Cancel</button>
+        <button onclick="handleSave()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">💾 Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderField(field,item){
+  const v=item[field.key];
+  switch(field.type){
+    case'jsonb':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <div class="space-y-1.5">
+        ${LANGS.map(l=>`<div class="flex gap-2 items-center">
+          <span class="lang-badge lang-${l}">${l.toUpperCase()}</span>
+          <input type="text" data-field="${field.key}" data-lang="${l}" value="${esc(v?.[l]||'')}"
+            class="flex-1 px-3 py-1.5 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none text-sm">
+        </div>`).join('')}
+      </div>
+    </div>`;
+    
+    case'game_modes_array':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <div class="flex gap-3">
+        ${GAME_MODES.map(m=>`<label class="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" data-field="${field.key}" data-mode="${m}" ${(v||[]).includes(m)?'checked':''}
+            class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-amber-500">
+          <span class="mode-badge mode-${m}">${m}</span>
+        </label>`).join('')}
+      </div>
+    </div>`;
+    
+    case'game_mode_select':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <select data-field="${field.key}" class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none text-sm">
+        ${GAME_MODES.map(m=>`<option value="${m}" ${v===m?'selected':''}>${m}</option>`).join('')}
+      </select>
+    </div>`;
+    
+    case'choices':
+      const choices=v||[];
+      return`<div>
+        <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+        <div id="choices-container" class="space-y-3">
+          ${choices.map((c,i)=>renderChoice(c,i)).join('')}
         </div>
-      `;
-    }
+        <button type="button" onclick="addChoice()" class="mt-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">➕ Add Choice</button>
+      </div>`;
+    
+    case'effects':
+      const effs=v||[];
+      return`<div>
+        <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+        <div id="effects-container" class="space-y-2">
+          ${effs.map((e,i)=>renderEffect(e,i)).join('')}
+        </div>
+        <button type="button" onclick="addEffect()" class="mt-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">➕ Add Effect</button>
+      </div>`;
+    
+    case'json':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <textarea data-field="${field.key}" data-type="json" rows="3"
+        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded font-mono text-xs focus:border-amber-500 focus:outline-none">${esc(JSON.stringify(v||{},null,2))}</textarea>
+    </div>`;
+    
+    case'boolean':return`<div class="flex items-center gap-2">
+      <input type="checkbox" data-field="${field.key}" ${v?'checked':''} class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-amber-500">
+      <label class="text-sm text-gray-300">${field.label}</label>
+    </div>`;
+    
+    case'select':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <select data-field="${field.key}" class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none text-sm">
+        <option value="">—</option>
+        ${(field.options||[]).map(o=>`<option value="${o}" ${v===o?'selected':''}>${o}</option>`).join('')}
+      </select>
+    </div>`;
+    
+    case'number':return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
+      <input type="number" data-field="${field.key}" value="${v||0}"
+        class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none text-sm">
+    </div>`;
+    
+    default:return`<div>
+      <label class="block text-sm text-gray-400 mb-1">${field.label}${field.pk?' *':''}</label>
+      <input type="text" data-field="${field.key}" value="${esc(v||'')}" ${field.pk?'required':''}
+        class="w-full px-3 py-1.5 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none text-sm">
+    </div>`;
+  }
+}
 
-    function renderContent() {
-      const config = TABLES[state.activeTab];
-      const items = state.data[state.activeTab] || [];
+function renderChoice(choice,index){
+  // Collect effect keys from choice
+  const effectKeys=Object.keys(choice.effects||{});
+  const allEffectKeys=[...new Set([...effectKeys])];
+  
+  return`<div class="bg-slate-700/50 rounded-lg p-3 border border-slate-600" data-choice-index="${index}">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-sm font-bold text-amber-300">Choice ${index+1}</span>
+      <button type="button" onclick="removeChoice(${index})" class="text-red-400 hover:text-red-300 text-sm">🗑️</button>
+    </div>
+    <div class="space-y-2">
+      <div class="text-xs text-gray-400">Text:</div>
+      ${LANGS.map(l=>`<div class="flex gap-2 items-center">
+        <span class="lang-badge lang-${l}">${l.toUpperCase()}</span>
+        <input type="text" data-choice="${index}" data-choice-field="text" data-lang="${l}"
+          value="${esc(choice.text?.[l]||'')}"
+          class="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+      </div>`).join('')}
       
-      if (items.length === 0) {
-        return `
-          <div class="p-8 text-center text-gray-400">
-            <p class="text-4xl mb-4">📭</p>
-            <p>Нет записей</p>
-          </div>
-        `;
-      }
-
-      return `
-        <div class="p-6">
-          <div class="space-y-2">
-            ${items.map(item => renderItem(config, item)).join('')}
-          </div>
-        </div>
-      `;
-    }
-
-    function renderItem(config, item) {
-      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
-      const titleField = config.fields.find(f => f.type === 'jsonb')?.key;
-      const title = titleField && item[titleField] ? (item[titleField].ru || item[titleField].en || JSON.stringify(item[titleField])) : item[primaryKey];
+      <div class="text-xs text-gray-400 mt-2">Effects (stat: value):</div>
+      <div id="choice-effects-${index}" class="space-y-1">
+        ${allEffectKeys.map((k,ei)=>`<div class="flex gap-2 items-center" data-choice-effect="${index}">
+          <input type="text" data-choice="${index}" data-choice-field="effect_key" data-effect-index="${ei}" value="${esc(k)}" placeholder="stat_id"
+            class="w-32 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+          <input type="number" data-choice="${index}" data-choice-field="effect_val" data-effect-index="${ei}" value="${choice.effects?.[k]||0}"
+            class="w-20 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+          <button type="button" onclick="removeChoiceEffect(${index},${ei})" class="text-red-400 text-sm">✕</button>
+        </div>`).join('')}
+      </div>
+      <button type="button" onclick="addChoiceEffect(${index})" class="text-xs px-2 py-0.5 bg-slate-600 hover:bg-slate-500 rounded">+ effect</button>
       
-      return `
-        <div class="bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-slate-600">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              ${item.icon ? `<span class="text-2xl">${item.icon}</span>` : ''}
-              <div>
-                <p class="font-bold text-amber-200">${escapeHtml(String(title).substring(0, 60))}</p>
-                <p class="text-sm text-gray-500">${item[primaryKey]}${item.system ? ` • ${item.system}` : ''}${item.is_active === false ? ' • <span class="text-red-400">неактивно</span>' : ''}</p>
-              </div>
-            </div>
-            <div class="flex gap-2">
-              <button onclick="handleEdit('${item[primaryKey]}')" class="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">
-                ✏️ Редактировать
-              </button>
-              <button onclick="handleDelete('${item[primaryKey]}')" class="px-3 py-1 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded text-sm">
-                🗑️
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
+      <div class="text-xs text-gray-400 mt-2">Chain Event:</div>
+      <div class="flex gap-2">
+        <input type="text" data-choice="${index}" data-choice-field="triggers_event" value="${esc(choice.triggers_event||'')}" placeholder="event_id (optional)"
+          class="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+        <input type="number" data-choice="${index}" data-choice-field="chain_delay" value="${choice.chain_delay||0}" placeholder="delay"
+          class="w-16 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none" title="Chain delay (turns)">
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderEffect(effect,index){
+  return`<div class="bg-slate-700/50 rounded-lg p-2 border border-slate-600 flex gap-2 items-center" data-effect-index="${index}">
+    <div class="flex-1">
+      <label class="text-xs text-gray-400">Stat ID</label>
+      <input type="text" data-effect="${index}" data-effect-field="stat" value="${esc(effect.stat||'')}" placeholder="happiness..."
+        class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+    </div>
+    <div class="w-20">
+      <label class="text-xs text-gray-400">Multiplier</label>
+      <input type="number" step="0.01" data-effect="${index}" data-effect-field="multiplier" value="${effect.multiplier||0}"
+        class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+    </div>
+    <div class="w-20">
+      <label class="text-xs text-gray-400">Baseline</label>
+      <input type="number" data-effect="${index}" data-effect-field="baseline" value="${effect.baseline||0}"
+        class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+    </div>
+    <button type="button" onclick="removeEffect(${index})" class="text-red-400 hover:text-red-300 text-sm mt-4">🗑️</button>
+  </div>`;
+}
+
+// ===== EVENT HANDLERS =====
+function attachLoginListener(){
+  const f=document.getElementById('loginForm');
+  if(f)f.onsubmit=async e=>{
+    e.preventDefault();
+    try{await signIn(document.getElementById('email').value,document.getElementById('password').value);}
+    catch(err){toast('Login error: '+err.message,'error');}
+  };
+}
+
+window.switchTab=async function(tab){
+  S.tab=tab;S.modeFilter='all';
+  if(!S.data[tab])await loadData(tab);
+  render();
+};
+
+window.setModeFilter=function(mode){S.modeFilter=mode;render();};
+window.handleRefresh=async function(){await loadData(S.tab);};
+
+window.handleAdd=function(){
+  const cfg=TABS[S.tab];
+  const item={};
+  cfg.fields.forEach(f=>{
+    if(f.type==='jsonb')item[f.key]={en:'',ru:''};
+    else if(f.type==='choices')item[f.key]=[];
+    else if(f.type==='effects')item[f.key]=[];
+    else if(f.type==='json')item[f.key]={};
+    else if(f.type==='game_modes_array')item[f.key]=['executive'];
+    else if(f.type==='game_mode_select')item[f.key]=S.modeFilter!=='all'?S.modeFilter:'executive';
+    else if(f.type==='boolean')item[f.key]=true;
+    else if(f.type==='number')item[f.key]=0;
+    else item[f.key]='';
+  });
+  S.editing=item;
+  render();
+};
+
+window.handleEdit=function(pkId){
+  const parts=pkId.split('|||');
+  const cfg=TABS[S.tab];
+  const items=S.data[S.tab]||[];
+  const item=items.find(i=>cfg.pkFields.every((pk,idx)=>String(i[pk])===parts[idx]));
+  if(item){S.editing={...item,_original:item};render();}
+};
+
+window.handleDelete=function(pkId){
+  const parts=pkId.split('|||');
+  const cfg=TABS[S.tab];
+  const items=S.data[S.tab]||[];
+  const item=items.find(i=>cfg.pkFields.every((pk,idx)=>String(i[pk])===parts[idx]));
+  if(item)deleteItem(S.tab,item);
+};
+
+window.handleCloseModal=function(e){
+  if(!e||e.target===e.currentTarget){S.editing=null;render();}
+};
+
+window.handleSave=async function(){
+  const cfg=TABS[S.tab];
+  const form=document.getElementById('editForm');
+  const item={...S.editing};
+  
+  // Collect simple fields
+  form.querySelectorAll('[data-field]').forEach(input=>{
+    const field=input.dataset.field;
+    const lang=input.dataset.lang;
+    const type=input.dataset.type;
+    const mode=input.dataset.mode;
+    
+    if(mode){
+      // game_modes_array checkboxes
+      if(!item[field])item[field]=[];
+      if(input.checked&&!item[field].includes(mode))item[field].push(mode);
+      if(!input.checked)item[field]=item[field].filter(m=>m!==mode);
+    }else if(lang){
+      if(!item[field])item[field]={};
+      item[field][lang]=input.value;
+    }else if(type==='json'){
+      try{item[field]=JSON.parse(input.value);}
+      catch(e){toast('Invalid JSON in '+field,'error');return;}
+    }else if(input.type==='checkbox'&&!mode){
+      item[field]=input.checked;
+    }else if(input.type==='number'){
+      item[field]=parseFloat(input.value)||0;
+    }else if(input.tagName==='SELECT'){
+      item[field]=input.value;
+    }else{
+      item[field]=input.value;
     }
-
-    function renderEditModal() {
-      const config = TABLES[state.activeTab];
-      const item = state.editing;
-      const isNew = !item._original;
-      
-      return `
-        <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onclick="handleCloseModal(event)">
-          <div class="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden" onclick="event.stopPropagation()">
-            <div class="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 class="text-lg font-bold text-amber-400">${isNew ? '➕ Новая запись' : '✏️ Редактирование'}</h3>
-              <button onclick="handleCloseModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            <div class="p-4 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <form id="editForm" class="space-y-4">
-                ${config.fields.map(field => renderField(field, item)).join('')}
-              </form>
-            </div>
-            <div class="p-4 border-t border-slate-700 flex justify-end gap-2">
-              <button onclick="handleCloseModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
-                Отмена
-              </button>
-              <button onclick="handleSave()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg font-bold">
-                💾 Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderField(field, item) {
-      const value = item[field.key];
-      
-      switch (field.type) {
-        case 'jsonb':
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <div class="space-y-2">
-                ${state.languages.map(lang => `
-                  <div class="flex gap-2 items-center">
-                    <span class="lang-badge lang-${lang}">${lang.toUpperCase()}</span>
-                    <input type="text" data-field="${field.key}" data-lang="${lang}" 
-                      value="${escapeHtml(value?.[lang] || '')}"
-                      class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          `;
-        
-        case 'choices':
-          const choices = value || [];
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <div id="choices-container" class="space-y-3">
-                ${choices.map((choice, i) => renderChoice(choice, i)).join('')}
-              </div>
-              <button type="button" onclick="addChoice()" class="mt-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">
-                ➕ Добавить вариант
-              </button>
-            </div>
-          `;
-        
-        case 'effects':
-          const effects = value || [];
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <div id="effects-container" class="space-y-2">
-                ${effects.map((effect, i) => renderEffect(effect, i)).join('')}
-              </div>
-              <button type="button" onclick="addEffect()" class="mt-2 px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm">
-                ➕ Добавить эффект
-              </button>
-            </div>
-          `;
-        
-        case 'json':
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <textarea data-field="${field.key}" data-type="json" rows="4"
-                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded font-mono text-sm focus:border-amber-500 focus:outline-none">${escapeHtml(JSON.stringify(value || {}, null, 2))}</textarea>
-            </div>
-          `;
-        
-        case 'boolean':
-          return `
-            <div class="flex items-center gap-2">
-              <input type="checkbox" data-field="${field.key}" ${value ? 'checked' : ''} 
-                class="w-5 h-5 rounded bg-slate-700 border-slate-600 text-amber-500 focus:ring-amber-500">
-              <label class="text-gray-300">${field.label}</label>
-            </div>
-          `;
-        
-        case 'select':
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <select data-field="${field.key}" 
-                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
-                ${field.options.map(opt => `
-                  <option value="${opt}" ${value === opt ? 'selected' : ''}>${opt}</option>
-                `).join('')}
-              </select>
-            </div>
-          `;
-        
-        case 'number':
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}</label>
-              <input type="number" data-field="${field.key}" value="${value || 0}"
-                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
-            </div>
-          `;
-        
-        default:
-          return `
-            <div>
-              <label class="block text-sm text-gray-400 mb-1">${field.label}${field.required ? ' *' : ''}</label>
-              <input type="text" data-field="${field.key}" value="${escapeHtml(value || '')}"
-                ${field.required ? 'required' : ''}
-                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded focus:border-amber-500 focus:outline-none">
-            </div>
-          `;
-      }
-    }
-
-    function renderChoice(choice, index) {
-      return `
-        <div class="bg-slate-700/50 rounded-lg p-3 border border-slate-600" data-choice-index="${index}">
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-sm font-bold text-amber-300">Вариант ${index + 1}</span>
-            <button type="button" onclick="removeChoice(${index})" class="text-red-400 hover:text-red-300 text-sm">🗑️</button>
-          </div>
-          <div class="space-y-2">
-            <div class="text-xs text-gray-400 mb-1">Текст:</div>
-            ${state.languages.map(lang => `
-              <div class="flex gap-2 items-center">
-                <span class="lang-badge lang-${lang}">${lang.toUpperCase()}</span>
-                <input type="text" data-choice="${index}" data-choice-field="text" data-lang="${lang}"
-                  value="${escapeHtml(choice.text?.[lang] || '')}"
-                  class="flex-1 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-            `).join('')}
-            <div class="grid grid-cols-3 gap-2 mt-2">
-              <div>
-                <label class="text-xs text-gray-400">😊 Счастье</label>
-                <input type="number" data-choice="${index}" data-choice-field="effects.happiness" value="${choice.effects?.happiness || 0}"
-                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="text-xs text-gray-400">💰 Богатство</label>
-                <input type="number" data-choice="${index}" data-choice-field="effects.wealth" value="${choice.effects?.wealth || 0}"
-                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="text-xs text-gray-400">⚖️ Стабильность</label>
-                <input type="number" data-choice="${index}" data-choice-field="effects.stability" value="${choice.effects?.stability || 0}"
-                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-xs text-gray-400">💵 Стоимость</label>
-                <input type="number" data-choice="${index}" data-choice-field="cost" value="${choice.cost || 0}"
-                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-              <div>
-                <label class="text-xs text-gray-400">🪙 Hydrobite</label>
-                <input type="number" data-choice="${index}" data-choice-field="hydro" value="${choice.hydro || 0}"
-                  class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderEffect(effect, index) {
-      return `
-        <div class="bg-slate-700/50 rounded-lg p-3 border border-slate-600 flex gap-3 items-center" data-effect-index="${index}">
-          <div class="flex-1">
-            <label class="text-xs text-gray-400">Stat ID</label>
-            <input type="text" data-effect="${index}" data-effect-field="stat" value="${escapeHtml(effect.stat || '')}"
-              placeholder="happiness, wealth..."
-              class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-          </div>
-          <div class="w-24">
-            <label class="text-xs text-gray-400">Multiplier</label>
-            <input type="number" step="0.01" data-effect="${index}" data-effect-field="multiplier" value="${effect.multiplier || 0}"
-              class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-          </div>
-          <div class="w-24">
-            <label class="text-xs text-gray-400">Baseline</label>
-            <input type="number" data-effect="${index}" data-effect-field="baseline" value="${effect.baseline || 0}"
-              class="w-full px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
-          </div>
-          <button type="button" onclick="removeEffect(${index})" class="text-red-400 hover:text-red-300 text-sm mt-4">🗑️</button>
-        </div>
-      `;
-    }
-
-    // ===== EVENT HANDLERS =====
-    function attachEventListeners() {
-      const loginForm = document.getElementById('loginForm');
-      if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const email = document.getElementById('email').value;
-          const password = document.getElementById('password').value;
-          try {
-            await signIn(email, password);
-          } catch (err) {
-            alert('Ошибка входа: ' + err.message);
-          }
-        });
-      }
-    }
-
-    window.switchTab = async function(tab) {
-      state.activeTab = tab;
-      if (!state.data[tab]) {
-        await loadData(tab);
-      }
-      render();
-    };
-
-    window.handleRefresh = async function() {
-      await loadData(state.activeTab);
-    };
-
-    window.handleAdd = function() {
-      const config = TABLES[state.activeTab];
-      const newItem = {};
-      config.fields.forEach(f => {
-        if (f.type === 'jsonb') newItem[f.key] = { ru: '', en: '', de: '' };
-        else if (f.type === 'choices') newItem[f.key] = [];
-        else if (f.type === 'effects') newItem[f.key] = [];
-        else if (f.type === 'json') newItem[f.key] = {};
-        else if (f.type === 'boolean') newItem[f.key] = true;
-        else if (f.type === 'number') newItem[f.key] = 0;
-        else newItem[f.key] = '';
+  });
+  
+  // Collect choices
+  const cc=document.getElementById('choices-container');
+  if(cc){
+    const choices=[];
+    cc.querySelectorAll('[data-choice-index]').forEach(el=>{
+      const choice={text:{},effects:{}};
+      // Text fields
+      el.querySelectorAll('[data-choice-field="text"]').forEach(inp=>{
+        choice.text[inp.dataset.lang]=inp.value;
       });
-      state.editing = newItem;
-      render();
-    };
-
-    window.handleEdit = function(id) {
-      const items = state.data[state.activeTab] || [];
-      const config = TABLES[state.activeTab];
-      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
-      const item = items.find(i => i[primaryKey] === id);
-      if (item) {
-        state.editing = { ...item, _original: item };
-        render();
-      }
-    };
-
-    window.handleDelete = async function(id) {
-      const items = state.data[state.activeTab] || [];
-      const config = TABLES[state.activeTab];
-      const primaryKey = config.fields.find(f => f.required)?.key || 'id';
-      const item = items.find(i => i[primaryKey] === id);
-      if (item) {
-        await deleteItem(state.activeTab, item);
-      }
-    };
-
-    window.handleCloseModal = function(event) {
-      if (!event || event.target === event.currentTarget) {
-        state.editing = null;
-        render();
-      }
-    };
-
-    window.handleSave = async function() {
-      const config = TABLES[state.activeTab];
-      const form = document.getElementById('editForm');
-      const item = { ...state.editing };
-      
-      // Collect form data
-      form.querySelectorAll('[data-field]').forEach(input => {
-        const field = input.dataset.field;
-        const lang = input.dataset.lang;
-        const type = input.dataset.type;
-        
-        if (lang) {
-          if (!item[field]) item[field] = {};
-          item[field][lang] = input.value;
-        } else if (type === 'json') {
-          try {
-            item[field] = JSON.parse(input.value);
-          } catch (e) {
-            alert('Неверный JSON в поле ' + field);
-            return;
-          }
-        } else if (input.type === 'checkbox') {
-          item[field] = input.checked;
-        } else if (input.type === 'number') {
-          item[field] = parseInt(input.value) || 0;
-        } else {
-          item[field] = input.value;
-        }
+      // Effects (dynamic key-value pairs)
+      const keys=el.querySelectorAll('[data-choice-field="effect_key"]');
+      const vals=el.querySelectorAll('[data-choice-field="effect_val"]');
+      keys.forEach((kInp,i)=>{
+        const k=kInp.value.trim();
+        if(k)choice.effects[k]=parseInt(vals[i]?.value)||0;
       });
-      
-      // Collect choices
-      const choicesContainer = document.getElementById('choices-container');
-      if (choicesContainer) {
-        const choices = [];
-        choicesContainer.querySelectorAll('[data-choice-index]').forEach(choiceEl => {
-          const choice = { text: {}, effects: {} };
-          choiceEl.querySelectorAll('[data-choice]').forEach(input => {
-            const choiceField = input.dataset.choiceField;
-            const lang = input.dataset.lang;
-            
-            if (choiceField === 'text' && lang) {
-              choice.text[lang] = input.value;
-            } else if (choiceField.startsWith('effects.')) {
-              const effectKey = choiceField.split('.')[1];
-              choice.effects[effectKey] = parseInt(input.value) || 0;
-            } else if (choiceField === 'cost') {
-              choice.cost = parseInt(input.value) || 0;
-            } else if (choiceField === 'hydro') {
-              choice.hydro = parseInt(input.value) || 0;
-            }
-          });
-          choices.push(choice);
-        });
-        item.choices = choices;
-      }
-      
-      // Collect effects (for budget_categories_v2)
-      const effectsContainer = document.getElementById('effects-container');
-      if (effectsContainer) {
-        const effects = [];
-        effectsContainer.querySelectorAll('[data-effect-index]').forEach(effectEl => {
-          const effect = {};
-          effectEl.querySelectorAll('[data-effect]').forEach(input => {
-            const effectField = input.dataset.effectField;
-            if (effectField === 'stat') {
-              effect.stat = input.value;
-            } else if (effectField === 'multiplier') {
-              effect.multiplier = parseFloat(input.value) || 0;
-            } else if (effectField === 'baseline') {
-              effect.baseline = parseFloat(input.value) || 0;
-            }
-          });
-          if (effect.stat) effects.push(effect);
-        });
-        item.effects = effects;
-      }
-      
-      await saveItem(state.activeTab, item);
-    };
-
-    window.addChoice = function() {
-      const container = document.getElementById('choices-container');
-      const index = container.children.length;
-      const choice = { text: { ru: '', en: '', de: '' }, effects: {}, cost: 0, hydro: 0 };
-      container.insertAdjacentHTML('beforeend', renderChoice(choice, index));
-    };
-
-    window.removeChoice = function(index) {
-      const container = document.getElementById('choices-container');
-      const el = container.querySelector(`[data-choice-index="${index}"]`);
-      if (el) el.remove();
-      // Re-index remaining choices
-      container.querySelectorAll('[data-choice-index]').forEach((el, i) => {
-        el.dataset.choiceIndex = i;
-        el.querySelector('span').textContent = `Вариант ${i + 1}`;
+      // Chain fields
+      const te=el.querySelector('[data-choice-field="triggers_event"]');
+      const cd=el.querySelector('[data-choice-field="chain_delay"]');
+      if(te&&te.value.trim())choice.triggers_event=te.value.trim();
+      if(cd&&parseInt(cd.value))choice.chain_delay=parseInt(cd.value);
+      choices.push(choice);
+    });
+    item.choices=choices;
+  }
+  
+  // Collect effects (budget)
+  const ec=document.getElementById('effects-container');
+  if(ec){
+    const effects=[];
+    ec.querySelectorAll('[data-effect-index]').forEach(el=>{
+      const effect={};
+      el.querySelectorAll('[data-effect]').forEach(inp=>{
+        const f=inp.dataset.effectField;
+        if(f==='stat')effect.stat=inp.value;
+        else if(f==='multiplier')effect.multiplier=parseFloat(inp.value)||0;
+        else if(f==='baseline')effect.baseline=parseFloat(inp.value)||0;
       });
-    };
+      if(effect.stat)effects.push(effect);
+    });
+    item.effects=effects;
+  }
+  
+  await saveItem(S.tab,item);
+};
 
-    window.addEffect = function() {
-      const container = document.getElementById('effects-container');
-      const index = container.children.length;
-      const effect = { stat: '', multiplier: 0.3, baseline: 15 };
-      container.insertAdjacentHTML('beforeend', renderEffect(effect, index));
-    };
+// Choice helpers
+window.addChoice=function(){
+  const cc=document.getElementById('choices-container');
+  const i=cc.children.length;
+  cc.insertAdjacentHTML('beforeend',renderChoice({text:{en:'',ru:''},effects:{}},i));
+};
 
-    window.removeEffect = function(index) {
-      const container = document.getElementById('effects-container');
-      const el = container.querySelector(`[data-effect-index="${index}"]`);
-      if (el) el.remove();
-      // Re-index remaining effects
-      container.querySelectorAll('[data-effect-index]').forEach((el, i) => {
-        el.dataset.effectIndex = i;
-      });
-    };
+window.removeChoice=function(i){
+  const cc=document.getElementById('choices-container');
+  const el=cc.querySelector(`[data-choice-index="${i}"]`);
+  if(el)el.remove();
+  // Re-index
+  cc.querySelectorAll('[data-choice-index]').forEach((el,idx)=>{
+    el.dataset.choiceIndex=idx;
+    el.querySelector('span').textContent=`Choice ${idx+1}`;
+  });
+};
 
-    window.handleSignOut = async function() {
-      await signOut();
-    };
+window.addChoiceEffect=function(choiceIdx){
+  const container=document.getElementById(`choice-effects-${choiceIdx}`);
+  if(!container)return;
+  const ei=container.children.length;
+  container.insertAdjacentHTML('beforeend',`<div class="flex gap-2 items-center" data-choice-effect="${choiceIdx}">
+    <input type="text" data-choice="${choiceIdx}" data-choice-field="effect_key" data-effect-index="${ei}" value="" placeholder="stat_id"
+      class="w-32 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+    <input type="number" data-choice="${choiceIdx}" data-choice-field="effect_val" data-effect-index="${ei}" value="0"
+      class="w-20 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-sm focus:border-amber-500 focus:outline-none">
+    <button type="button" onclick="this.parentElement.remove()" class="text-red-400 text-sm">✕</button>
+  </div>`);
+};
 
-    // ===== UTILS =====
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
+window.removeChoiceEffect=function(choiceIdx,effectIdx){
+  const container=document.getElementById(`choice-effects-${choiceIdx}`);
+  if(!container)return;
+  const el=container.children[effectIdx];
+  if(el)el.remove();
+};
 
-    // ===== INIT =====
-    checkAuth();
-  </script>
+// Effect helpers (budget)
+window.addEffect=function(){
+  const ec=document.getElementById('effects-container');
+  const i=ec.children.length;
+  ec.insertAdjacentHTML('beforeend',renderEffect({stat:'',multiplier:0.3,baseline:15},i));
+};
+
+window.removeEffect=function(i){
+  const ec=document.getElementById('effects-container');
+  const el=ec.querySelector(`[data-effect-index="${i}"]`);
+  if(el)el.remove();
+};
+
+window.handleSignOut=async function(){
+  await supabase.auth.signOut();
+  S.user=null;S.profile=null;render();
+};
+
+function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ===== INIT =====
+checkAuth();
+</script>
 </body>
 </html>
