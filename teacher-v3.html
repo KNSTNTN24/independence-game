@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Independence - Teacher Dashboard V3</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body{font-family:'Segoe UI',sans-serif}
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:100}
+    .mode-badge{padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600}
+    .mode-executive{background:#7c3aed20;color:#a78bfa;border:1px solid #7c3aed40}
+    .mode-party{background:#2563eb20;color:#60a5fa;border:1px solid #2563eb40}
+    .mode-council{background:#05966920;color:#34d399;border:1px solid #05966940}
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+<div id="app"></div>
+<div id="modal"></div>
+
+<script type="module">
+const SUPABASE_URL='https://dnkeinsedcrlhwbiycfo.supabase.co';
+const SUPABASE_ANON_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRua2VpbnNlZGNybGh3Yml5Y2ZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NDg0MjgsImV4cCI6MjA4NDMyNDQyOH0.9IkWv6dwOemaVwvWrwq7ZzuebrgWI83JWrdaZbzdhhw';
+const supabase=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+
+let S={
+  user:null,teacher:null,school:null,loading:true,error:null,
+  activeTab:'classrooms',
+  classrooms:[],selectedClassroom:null,
+  students:[],results:[],sessions:[],
+  scenarios:[],
+  // V3 data
+  gameModes:[],stats:[],environments:[],approaches:[],
+  // Session start modal
+  showStartModal:false,
+  startConfig:{mode:'executive',environmentId:'',approachId:'',scenarioId:null,maxTurns:15}
+};
+
+// ===== AUTH =====
+async function checkAuth(){
+  const{data:{session}}=await supabase.auth.getSession();
+  if(!session){S.loading=false;render();return;}
+  S.user=session.user;
+  const{data:teacher}=await supabase.from('teachers').select('*, schools(*)').eq('id',session.user.id).single();
+  if(!teacher){S.loading=false;S.error='You are not registered as a teacher.';render();return;}
+  S.teacher=teacher;S.school=teacher.schools;S.loading=false;
+  await Promise.all([loadClassrooms(),loadScenarios(),loadV3Data()]);
+  render();
+}
+
+async function loadV3Data(){
+  const[statsR,modesR,envR,appR]=await Promise.all([
+    supabase.from('stats').select('*').order('sort_order'),
+    supabase.from('game_modes').select('*').eq('is_active',true).order('sort_order'),
+    supabase.from('environments').select('*').eq('is_active',true).order('sort_order'),
+    supabase.from('approaches').select('*').eq('is_active',true).order('sort_order')
+  ]);
+  S.stats=statsR.data||[];
+  S.gameModes=modesR.data||[];
+  S.environments=envR.data||[];
+  S.approaches=appR.data||[];
+}
+
+async function signIn(email,password){
+  const{error}=await supabase.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  await checkAuth();
+}
+
+// ===== DATA LOADING =====
+async function loadClassrooms(){
+  const{data}=await supabase.from('classrooms').select('*').eq('teacher_id',S.user.id).eq('is_active',true).order('created_at',{ascending:false});
+  S.classrooms=data||[];
+}
+
+async function loadScenarios(){
+  const{data}=await supabase.from('scenarios').select('*').eq('is_active',true).order('sort_order');
+  S.scenarios=data||[];
+}
+
+async function loadStudents(classroomId){
+  const{data}=await supabase.from('students').select('*').eq('classroom_id',classroomId).eq('is_active',true).order('display_name');
+  S.students=data||[];
+}
+
+async function loadSessions(classroomId){
+  const{data}=await supabase.from('classroom_sessions').select('*, scenarios(*)').eq('classroom_id',classroomId).order('started_at',{ascending:false});
+  S.sessions=data||[];
+}
+
+async function loadResults(sessionId){
+  const{data}=await supabase.from('student_results').select('*, students(display_name)').eq('session_id',sessionId).order('final_score',{ascending:false});
+  S.results=data||[];
+  // Try to determine game mode from session
+  const session=S.sessions.find(s=>s.id===sessionId);
+  S._resultsGameMode=session?.game_mode||session?.scenarios?.game_mode||'executive';
+  S._resultsSessionId=sessionId;
+  render();
+}
+
+// ===== CLASSROOM ACTIONS =====
+async function createClassroom(name){
+  const words=['MARS','LUNA','NOVA','STAR','TERRA','ORION','VEGA','ATLAS'];
+  const code=words[Math.floor(Math.random()*words.length)]+'-'+Math.random().toString(36).substring(2,6).toUpperCase();
+  const{error}=await supabase.from('classrooms').insert({school_id:S.school.id,teacher_id:S.user.id,name,join_code:code});
+  if(error){alert('Error: '+error.message);return;}
+  await loadClassrooms();render();
+}
+
+async function deleteClassroom(id){
+  if(!confirm('Delete this classroom?'))return;
+  await supabase.from('classrooms').update({is_active:false}).eq('id',id);
+  await loadClassrooms();
+  if(S.selectedClassroom?.id===id)S.selectedClassroom=null;
+  render();
+}
+
+async function selectClassroom(classroom){
+  S.selectedClassroom=classroom;
+  S.activeTab='students';
+  await Promise.all([loadStudents(classroom.id),loadSessions(classroom.id)]);
+  render();
+}
+
+// ===== SESSION ACTIONS =====
+async function startSession(){
+  const cfg=S.startConfig;
+  if(!S.selectedClassroom)return;
+  // End any active sessions
+  await supabase.from('classroom_sessions')
+    .update({status:'completed',ended_at:new Date().toISOString()})
+    .eq('classroom_id',S.selectedClassroom.id)
+    .eq('status','active');
+  
+  const sessionData={
+    classroom_id:S.selectedClassroom.id,
+    scenario_id:cfg.scenarioId||null,
+    status:'active',
+    game_mode:cfg.mode,
+    environment_id:cfg.environmentId||null,
+    approach_id:cfg.approachId||null,
+    max_turns:cfg.maxTurns
+  };
+  
+  const{error}=await supabase.from('classroom_sessions').insert(sessionData);
+  if(error){alert('Error: '+error.message);return;}
+  S.showStartModal=false;
+  await loadSessions(S.selectedClassroom.id);
+  render();
+}
+
+async function endSession(sessionId){
+  if(!confirm('End this session?'))return;
+  await supabase.from('classroom_sessions').update({status:'completed',ended_at:new Date().toISOString()}).eq('id',sessionId);
+  await loadSessions(S.selectedClassroom.id);
+  render();
+}
+
+// ===== RENDER =====
+function render(){
+  const app=document.getElementById('app');
+  const modal=document.getElementById('modal');
+  
+  if(S.loading){app.innerHTML=`<div class="flex items-center justify-center min-h-screen"><div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>`;return;}
+  if(S.error){app.innerHTML=`<div class="flex items-center justify-center min-h-screen"><div class="text-center"><p class="text-red-400 text-xl mb-4">⚠️ ${S.error}</p><button onclick="location.reload()" class="px-4 py-2 bg-slate-700 rounded">Refresh</button></div></div>`;return;}
+  if(!S.user){app.innerHTML=renderLogin();attachLoginHandler();modal.innerHTML='';return;}
+
+  app.innerHTML=`<div class="flex h-screen">${renderSidebar()}<div class="flex-1 overflow-auto">${renderHeader()}${renderContent()}</div></div>`;
+  modal.innerHTML=S.showStartModal?renderStartModal():'';
+}
+
+function renderLogin(){
+  return`<div class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-slate-800 p-8 rounded-xl max-w-md w-full">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-blue-400 mb-2">🎓 Teacher Dashboard</h1>
+        <p class="text-gray-400">Independence V3 - School Edition</p>
+      </div>
+      <form id="loginForm" class="space-y-4">
+        <div><label class="block text-sm text-gray-400 mb-1">Email</label>
+          <input type="email" id="email" required class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none"></div>
+        <div><label class="block text-sm text-gray-400 mb-1">Password</label>
+          <input type="password" id="password" required class="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg focus:border-blue-500 focus:outline-none"></div>
+        <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold">Sign In</button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function renderSidebar(){
+  const sc=S.selectedClassroom;
+  return`<div class="w-60 bg-slate-800 border-r border-slate-700 flex flex-col">
+    <div class="p-4 border-b border-slate-700">
+      <h1 class="text-lg font-bold text-blue-400">🎓 Teacher V3</h1>
+      <p class="text-xs text-gray-400">${esc(S.school?.name||'School')}</p>
+    </div>
+    <nav class="flex-1 p-2 overflow-y-auto">
+      <button onclick="switchTab('classrooms')" class="w-full text-left px-3 py-2.5 rounded-lg mb-1 flex items-center gap-2 text-sm ${S.activeTab==='classrooms'?'bg-blue-600/20 text-blue-400':'hover:bg-slate-700 text-gray-300'}">
+        <span>📚</span> My Classrooms
+        <span class="ml-auto text-xs opacity-50">${S.classrooms.length}</span>
+      </button>
+      ${sc?`
+        <div class="mt-3 pt-3 border-t border-slate-700">
+          <p class="text-xs text-gray-500 px-3 mb-1">SELECTED</p>
+          <p class="text-blue-300 px-3 font-bold text-sm">${esc(sc.name)}</p>
+          <p class="text-xs text-gray-500 px-3 mb-3 font-mono">${sc.join_code}</p>
+          <button onclick="switchTab('students')" class="w-full text-left px-3 py-2 rounded-lg mb-0.5 flex items-center gap-2 text-sm ${S.activeTab==='students'?'bg-blue-600/20 text-blue-400':'hover:bg-slate-700 text-gray-300'}">
+            <span>👥</span> Students <span class="ml-auto text-xs opacity-50">${S.students.length}</span>
+          </button>
+          <button onclick="switchTab('sessions')" class="w-full text-left px-3 py-2 rounded-lg mb-0.5 flex items-center gap-2 text-sm ${S.activeTab==='sessions'?'bg-blue-600/20 text-blue-400':'hover:bg-slate-700 text-gray-300'}">
+            <span>🎮</span> Sessions <span class="ml-auto text-xs opacity-50">${S.sessions.length}</span>
+          </button>
+          <button onclick="switchTab('results')" class="w-full text-left px-3 py-2 rounded-lg mb-0.5 flex items-center gap-2 text-sm ${S.activeTab==='results'?'bg-blue-600/20 text-blue-400':'hover:bg-slate-700 text-gray-300'}">
+            <span>📊</span> Results
+          </button>
+        </div>
+      `:''}
+    </nav>
+    <div class="p-3 border-t border-slate-700">
+      <p class="text-xs text-gray-400 mb-2">${esc(S.user?.email)}</p>
+      <button onclick="handleSignOut()" class="text-xs text-red-400 hover:text-red-300">Sign Out</button>
+    </div>
+  </div>`;
+}
+
+function renderHeader(){
+  const titles={classrooms:'📚 My Classrooms',students:'👥 Students',sessions:'🎮 Game Sessions',results:'📊 Results'};
+  let actions='';
+  if(S.activeTab==='classrooms')actions=`<button onclick="showCreateClassroom()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold">+ New Classroom</button>`;
+  if(S.activeTab==='sessions'&&S.selectedClassroom)actions=`<button onclick="openStartModal()" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold">▶️ Start Session</button>`;
+  return`<div class="p-4 border-b border-slate-700 flex justify-between items-center">
+    <h2 class="text-xl font-bold">${titles[S.activeTab]||''}</h2>
+    <div>${actions}</div>
+  </div>`;
+}
+
+function renderContent(){
+  switch(S.activeTab){
+    case'classrooms':return renderClassrooms();
+    case'students':return renderStudents();
+    case'sessions':return renderSessions();
+    case'results':return renderResults();
+    default:return'';
+  }
+}
+
+// ===== CLASSROOMS =====
+function renderClassrooms(){
+  if(!S.classrooms.length)return`<div class="p-8 text-center text-gray-400">
+    <p class="text-4xl mb-4">📚</p>
+    <p class="mb-4">No classrooms yet</p>
+    <button onclick="showCreateClassroom()" class="px-4 py-2 bg-blue-600 rounded-lg">Create your first classroom</button>
+  </div>`;
+  
+  return`<div class="p-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    ${S.classrooms.map(c=>`
+      <div class="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-blue-500/50 cursor-pointer transition" onclick="handleSelectClassroom('${c.id}')">
+        <div class="flex justify-between items-start mb-3">
+          <h3 class="text-lg font-bold text-blue-300">${esc(c.name)}</h3>
+          <button onclick="event.stopPropagation();handleDeleteClassroom('${c.id}')" class="text-gray-500 hover:text-red-400">🗑️</button>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-3 mb-3">
+          <p class="text-xs text-gray-500 mb-1">JOIN CODE</p>
+          <p class="text-2xl font-mono text-blue-400 tracking-wider">${c.join_code}</p>
+        </div>
+        <p class="text-xs text-gray-500">Created ${new Date(c.created_at).toLocaleDateString()}</p>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+// ===== STUDENTS =====
+function renderStudents(){
+  if(!S.selectedClassroom)return`<div class="p-8 text-center text-gray-400">Select a classroom first</div>`;
+  if(!S.students.length)return`<div class="p-8 text-center text-gray-400">
+    <p class="text-4xl mb-4">👥</p>
+    <p class="mb-2">No students have joined yet</p>
+    <p class="text-sm">Share this code:</p>
+    <p class="text-3xl font-mono text-blue-400 mt-2">${S.selectedClassroom.join_code}</p>
+  </div>`;
+  
+  return`<div class="p-6">
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-slate-700"><tr>
+          <th class="text-left p-4 text-sm">Student</th>
+          <th class="text-left p-4 text-sm">Joined</th>
+          <th class="text-left p-4 text-sm">Actions</th>
+        </tr></thead>
+        <tbody>
+          ${S.students.map(s=>`<tr class="border-t border-slate-700">
+            <td class="p-4"><span class="mr-2">${s.avatar||'👤'}</span>${esc(s.display_name)}</td>
+            <td class="p-4 text-gray-400 text-sm">${new Date(s.created_at).toLocaleDateString()}</td>
+            <td class="p-4"><button onclick="resetStudentPin('${s.id}')" class="text-sm text-blue-400 hover:text-blue-300">Reset PIN</button></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ===== SESSIONS =====
+function renderSessions(){
+  if(!S.selectedClassroom)return`<div class="p-8 text-center text-gray-400">Select a classroom first</div>`;
+  const active=S.sessions.filter(s=>s.status==='active');
+  const past=S.sessions.filter(s=>s.status!=='active');
+  
+  return`<div class="p-6 space-y-6">
+    ${active.length?`
+      <div>
+        <h3 class="text-lg font-bold text-green-400 mb-3">🟢 Active Session${active.length>1?'s':''}</h3>
+        ${active.map(s=>renderSessionCard(s,true)).join('')}
+      </div>
+    `:`
+      <div class="bg-slate-800 rounded-xl p-6 text-center border border-slate-700">
+        <p class="text-gray-400 mb-4">No active session</p>
+        <button onclick="openStartModal()" class="px-6 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold">▶️ Start Game Session</button>
+      </div>
+    `}
+    ${past.length?`
+      <div>
+        <h3 class="text-lg font-bold text-gray-400 mb-3">📁 Past Sessions</h3>
+        <div class="space-y-2">${past.map(s=>renderSessionCard(s,false)).join('')}</div>
+      </div>
+    `:''}
+  </div>`;
+}
+
+function renderSessionCard(s,isActive){
+  const mode=s.game_mode||s.scenarios?.game_mode||'executive';
+  const gm=S.gameModes.find(m=>m.id===mode);
+  const env=s.environment_id?S.environments.find(e=>e.id===s.environment_id&&e.game_mode===mode):null;
+  const app=s.approach_id?S.approaches.find(a=>a.id===s.approach_id&&a.game_mode===mode):null;
+  const scenarioTitle=s.scenarios?.title?.en||'';
+  
+  return`<div class="${isActive?'bg-green-900/20 border-green-500/30':'bg-slate-800 border-slate-700'} border rounded-xl p-4">
+    <div class="flex justify-between items-start mb-3">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="mode-badge mode-${mode}">${gm?.icon||''} ${mode}</span>
+          ${scenarioTitle?`<span class="text-sm text-gray-300">${esc(scenarioTitle)}</span>`:'<span class="text-sm text-gray-400">🎲 Free Play</span>'}
+          ${isActive?'<span class="px-2 py-0.5 bg-green-600/30 text-green-400 rounded-full text-xs">Active</span>':''}
+        </div>
+        <p class="text-xs text-gray-500">Started ${new Date(s.started_at).toLocaleString()}</p>
+        <div class="flex gap-3 mt-1 text-xs text-gray-400">
+          ${env?`<span>🌍 ${env.name?.en||env.id}</span>`:''}
+          ${app?`<span>🏛️ ${app.name?.en||app.id}</span>`:''}
+          ${s.max_turns?`<span>⏱️ ${s.max_turns} turns</span>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="handleLoadResults('${s.id}')" class="px-3 py-1.5 ${isActive?'bg-blue-600':'bg-slate-700 hover:bg-slate-600'} rounded-lg text-sm">📊 Results</button>
+      ${isActive?`<button onclick="handleEndSession('${s.id}')" class="px-3 py-1.5 bg-red-600/80 hover:bg-red-600 rounded-lg text-sm">⏹️ End</button>`:''}
+    </div>
+    ${isActive?`<p class="text-xs text-gray-500 mt-3">Join code: <span class="text-blue-400 font-mono">${S.selectedClassroom?.join_code||''}</span></p>`:''}
+  </div>`;
+}
+
+// ===== RESULTS =====
+function renderResults(){
+  if(!S.results.length)return`<div class="p-8 text-center text-gray-400">
+    <p class="text-4xl mb-4">📊</p>
+    <p>Select a session to view results</p>
+  </div>`;
+  
+  const mode=S._resultsGameMode||'executive';
+  const modeStats=S.stats.filter(s=>s.game_mode===mode);
+  
+  return`<div class="p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="mode-badge mode-${mode}">${mode}</span>
+      <span class="text-sm text-gray-400">${S.results.length} result${S.results.length>1?'s':''}</span>
+      <button onclick="handleExportCSV()" class="ml-auto px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm">📥 Export CSV</button>
+    </div>
+    <div class="bg-slate-800 rounded-xl border border-slate-700 overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-slate-700"><tr>
+          <th class="text-left p-3 text-xs">#</th>
+          <th class="text-left p-3 text-xs">Student</th>
+          <th class="text-left p-3 text-xs">Score</th>
+          <th class="text-left p-3 text-xs">Result</th>
+          ${modeStats.map(s=>`<th class="text-left p-3 text-xs" title="${s.name?.en||s.id}">${s.icon||s.id}</th>`).join('')}
+          <th class="text-left p-3 text-xs">Environment</th>
+          <th class="text-left p-3 text-xs">Approach</th>
+          <th class="text-left p-3 text-xs">📝</th>
+        </tr></thead>
+        <tbody>
+          ${S.results.map((r,i)=>{
+            const statsHtml=modeStats.map(s=>{
+              const val=r.final_stats?.[s.id]??0;
+              return`<td class="p-3 text-sm" style="color:${s.color||'#ccc'}">${Math.round(val)}%</td>`;
+            }).join('');
+            const envName=r.environment_id?S.environments.find(e=>e.id===r.environment_id)?.name?.en||r.environment_id:'—';
+            const appName=r.approach_id?S.approaches.find(a=>a.id===r.approach_id)?.name?.en||r.approach_id:'—';
+            return`<tr class="border-t border-slate-700">
+              <td class="p-3 text-gray-500 text-sm">${i+1}</td>
+              <td class="p-3 font-bold text-sm">${esc(r.students?.display_name||'?')}</td>
+              <td class="p-3 text-blue-400 font-bold">${r.final_score||0}</td>
+              <td class="p-3">${r.is_victory?'<span class="text-green-400">🏆</span>':'<span class="text-red-400">💀</span>'}</td>
+              ${statsHtml}
+              <td class="p-3 text-xs text-gray-400">${esc(envName)}</td>
+              <td class="p-3 text-xs text-gray-400">${esc(appName)}</td>
+              <td class="p-3">${r.reflection_answers?`<button onclick="showReflection('${r.id}')" class="text-blue-400 hover:text-blue-300 text-xs">View</button>`:'-'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+// ===== START SESSION MODAL =====
+function renderStartModal(){
+  const cfg=S.startConfig;
+  const modeEnvs=S.environments.filter(e=>e.game_mode===cfg.mode);
+  const modeApps=S.approaches.filter(a=>a.game_mode===cfg.mode);
+  const scenarios=S.scenarios.filter(s=>!s.game_mode||s.game_mode===cfg.mode);
+  const ks3=scenarios.filter(s=>s.curriculum_topic?.includes('KS3'));
+  const ks4=scenarios.filter(s=>s.curriculum_topic?.includes('KS4'));
+  const other=scenarios.filter(s=>!s.curriculum_topic?.includes('KS3')&&!s.curriculum_topic?.includes('KS4'));
+  
+  return`<div class="modal-bg" onclick="closeStartModal(event)">
+    <div class="bg-slate-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-auto m-4" onclick="event.stopPropagation()">
+      <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+        <h2 class="text-lg font-bold">▶️ Start Game Session</h2>
+        <button onclick="closeStartModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      </div>
+      <div class="p-4 space-y-5">
+        
+        <!-- Game Mode -->
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Game Mode</label>
+          <div class="grid grid-cols-3 gap-2">
+            ${S.gameModes.map(m=>`
+              <button onclick="setStartMode('${m.id}')" class="p-3 rounded-lg border text-center transition ${cfg.mode===m.id?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                <span class="text-2xl block mb-1">${m.icon||'🎮'}</span>
+                <span class="text-sm">${m.name?.en||m.id}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        
+        <!-- Environment -->
+        ${modeEnvs.length?`
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Environment (optional)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setStartEnv('')" class="p-2 rounded-lg border text-sm text-left transition ${!cfg.environmentId?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                🎲 Random / Student chooses
+              </button>
+              ${modeEnvs.map(e=>`
+                <button onclick="setStartEnv('${e.id}')" class="p-2 rounded-lg border text-sm text-left transition ${cfg.environmentId===e.id?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                  ${e.icon||'🌍'} ${e.name?.en||e.id}
+                  <span class="text-xs text-gray-500 ml-1">${'★'.repeat(e.difficulty||1)}</span>
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `:''}
+        
+        <!-- Approach -->
+        ${modeApps.length?`
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Approach (optional)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setStartApp('')" class="p-2 rounded-lg border text-sm text-left transition ${!cfg.approachId?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                🎲 Random / Student chooses
+              </button>
+              ${modeApps.map(a=>`
+                <button onclick="setStartApp('${a.id}')" class="p-2 rounded-lg border text-sm text-left transition ${cfg.approachId===a.id?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                  ${a.icon||'🏛️'} ${a.name?.en||a.id}
+                  ${a.is_premium?'<span class="text-yellow-400 text-xs">⭐</span>':''}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        `:''}
+        
+        <!-- Game Length -->
+        <div>
+          <label class="block text-sm text-gray-400 mb-2">Game Length: <span id="turnsLabel">${cfg.maxTurns}</span> turns</label>
+          <input type="range" min="5" max="30" value="${cfg.maxTurns}" oninput="setStartTurns(this.value)"
+            class="w-full accent-blue-500">
+        </div>
+        
+        <!-- Scenarios -->
+        ${scenarios.length?`
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Scenario (optional)</label>
+            <div class="space-y-2">
+              <button onclick="setStartScenario(null)" class="w-full p-3 rounded-lg border text-left transition text-sm ${!cfg.scenarioId?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+                🎲 Free Play — students choose settings
+              </button>
+              ${ks3.length?`<p class="text-xs font-bold text-green-400 pt-2">📗 KEY STAGE 3</p>${ks3.map(s=>renderScenarioOption(s)).join('')}`:''}
+              ${ks4.length?`<p class="text-xs font-bold text-blue-400 pt-2">📘 KEY STAGE 4</p>${ks4.map(s=>renderScenarioOption(s)).join('')}`:''}
+              ${other.length?`<p class="text-xs font-bold text-gray-400 pt-2">OTHER</p>${other.map(s=>renderScenarioOption(s)).join('')}`:''}
+            </div>
+          </div>
+        `:''}
+        
+        <!-- Start Button -->
+        <button onclick="handleStartSession()" class="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold text-lg">
+          ▶️ Start Session
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderScenarioOption(s){
+  const diffColors={easy:'text-green-400',normal:'text-yellow-400',hard:'text-red-400'};
+  return`<button onclick="setStartScenario('${s.id}')" class="w-full p-3 rounded-lg border text-left transition text-sm ${S.startConfig.scenarioId===s.id?'border-blue-500 bg-blue-600/20':'border-slate-600 bg-slate-700 hover:border-slate-500'}">
+    <div class="font-bold">${esc(s.title?.en||s.id)}</div>
+    <div class="text-xs text-gray-400 mt-0.5">${esc(s.description?.en||'')}</div>
+    <div class="flex gap-3 mt-1 text-xs">
+      <span class="text-gray-500">⏱️ ${s.duration_minutes||'?'} min</span>
+      <span class="text-gray-500">🔄 ${s.max_turns||'?'} turns</span>
+      <span class="${diffColors[s.difficulty]||'text-gray-400'}">${s.difficulty||''}</span>
+    </div>
+  </button>`;
+}
+
+// ===== EXPORT =====
+function exportCSV(){
+  if(!S.results.length)return;
+  const mode=S._resultsGameMode||'executive';
+  const modeStats=S.stats.filter(s=>s.game_mode===mode);
+  
+  const headers=['#','Student','Score','Result',...modeStats.map(s=>s.name?.en||s.id),'Environment','Approach'];
+  const rows=S.results.map((r,i)=>{
+    const statsVals=modeStats.map(s=>Math.round(r.final_stats?.[s.id]??0));
+    const envName=r.environment_id||'—';
+    const appName=r.approach_id||'—';
+    return[i+1,r.students?.display_name||'?',r.final_score||0,r.is_victory?'Win':'Loss',...statsVals,envName,appName];
+  });
+  
+  const csv=[headers,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`results_${mode}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();URL.revokeObjectURL(url);
+}
+
+// ===== EVENT HANDLERS =====
+function attachLoginHandler(){
+  document.getElementById('loginForm')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    try{await signIn(document.getElementById('email').value,document.getElementById('password').value);}
+    catch(err){alert('Login error: '+err.message);}
+  });
+}
+
+window.switchTab=tab=>{S.activeTab=tab;render();};
+window.showCreateClassroom=()=>{const name=prompt('Enter classroom name:');if(name)createClassroom(name);};
+window.handleSelectClassroom=id=>{const c=S.classrooms.find(x=>x.id===id);if(c)selectClassroom(c);};
+window.handleDeleteClassroom=id=>deleteClassroom(id);
+
+// Start modal
+window.openStartModal=()=>{
+  S.startConfig={mode:'executive',environmentId:'',approachId:'',scenarioId:null,maxTurns:15};
+  S.showStartModal=true;render();
+};
+window.closeStartModal=e=>{if(!e||e.target===e.currentTarget){S.showStartModal=false;render();}};
+window.setStartMode=mode=>{S.startConfig.mode=mode;S.startConfig.environmentId='';S.startConfig.approachId='';render();};
+window.setStartEnv=id=>{S.startConfig.environmentId=id;render();};
+window.setStartApp=id=>{S.startConfig.approachId=id;render();};
+window.setStartTurns=v=>{S.startConfig.maxTurns=parseInt(v);document.getElementById('turnsLabel').textContent=v;};
+window.setStartScenario=id=>{S.startConfig.scenarioId=id;render();};
+window.handleStartSession=()=>startSession();
+
+window.handleEndSession=id=>endSession(id);
+window.handleLoadResults=id=>{S.activeTab='results';loadResults(id);};
+window.handleExportCSV=()=>exportCSV();
+window.handleSignOut=async()=>{await supabase.auth.signOut();S.user=null;S.teacher=null;render();};
+window.showReflection=id=>{
+  const r=S.results.find(x=>x.id===id);
+  if(r?.reflection_answers)alert(`Reflection by ${r.students?.display_name}:\n\n${Object.entries(r.reflection_answers).map(([k,v])=>`${k}: ${v}`).join('\n\n')}`);
+};
+window.resetStudentPin=async id=>{
+  const pin=prompt('Enter new 4-digit PIN:');
+  if(pin?.length===4&&/^\d+$/.test(pin)){
+    await supabase.from('students').update({pin_code:pin}).eq('id',id);
+    alert('PIN updated');
+  }else if(pin!==null)alert('PIN must be 4 digits');
+};
+
+function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ===== INIT =====
+checkAuth();
+</script>
+</body>
+</html>
